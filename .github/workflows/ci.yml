@@ -22,5 +22,5 @@ jobs:
           ./scripts/package.ps1 -Client 335
       - uses: actions/upload-artifact@v4
         with:
-          name: PartyMemory-install-packages
+          name: FamiliarFaces-install-packages
           path: dist/*.zip

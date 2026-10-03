@@ -1,6 +1,8 @@
-# Party Memory
+# Familiar Faces
 
-Remember the people you adventure with. Party Memory automatically records dungeon and outdoor parties, so you can find that helpful healer or questing companion again.
+Previously called Party Memory. Open with `/ff` or `/familiarfaces`; `/pm` and `/partymemory` still work. The internal `PartyMemory` folder and SavedVariables name are retained so upgrading preserves your history, notes and favourites. Replace the files in your existing addon folder; do not rename it or install a second copy.
+
+Remember the people you adventure with. Familiar Faces automatically records dungeon and outdoor parties, so you can find that helpful healer or questing companion again.
 
 ## Features
 

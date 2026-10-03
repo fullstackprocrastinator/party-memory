@@ -1,8 +1,8 @@
 ## Interface: 120007
-## Title: Party Memory
+## Title: Familiar Faces
 ## Notes: Remember the people you adventure with.
 ## Author: fullstackprocrastinator
-## Version: 0.2.0
+## Version: 0.2.1
 ## SavedVariables: PartyMemoryDB
 ## DefaultState: enabled
 Store.lua

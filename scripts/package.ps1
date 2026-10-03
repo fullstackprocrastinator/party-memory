@@ -11,6 +11,6 @@ if ($Client -eq '335' -or $Client -eq 'Forever') {
     $interface = if ($Client -eq 'Forever') { '16001' } else { '30300' }
     (Get-Content -LiteralPath $toc -Raw).Replace('120007', $interface) | Set-Content -LiteralPath $toc -Encoding utf8
 }
-$zip = Join-Path $destination "PartyMemory-0.2.0-$Client.zip"
+$zip = Join-Path $destination "FamiliarFaces-0.2.1-$Client.zip"
 Compress-Archive -LiteralPath (Join-Path $stage 'PartyMemory') -DestinationPath $zip -Force
 Write-Output $zip

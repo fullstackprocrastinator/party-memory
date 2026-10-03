@@ -52,20 +52,22 @@ frame:SetScript("OnUpdate", function(_, delta)
 end)
 SLASH_PARTYMEMORY1 = "/pm"
 SLASH_PARTYMEMORY2 = "/partymemory"
+SLASH_PARTYMEMORY3 = "/ff"
+SLASH_PARTYMEMORY4 = "/familiarfaces"
 SlashCmdList.PARTYMEMORY = function(input)
     if not PM.db then return end
     input = string.lower(input or "")
     if input == "pause" or input == "resume" then
         PM.db.enabled = input == "resume"
         PM.EndSession(time())
-        DEFAULT_CHAT_FRAME:AddMessage("Party Memory: recording " .. (PM.db.enabled and "enabled." or "paused."))
+        DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: recording " .. (PM.db.enabled and "enabled." or "paused."))
         PM.Capture()
     elseif input == "clear confirm" then
         PartyMemoryDB = PM.Init({enabled = PM.db.enabled})
         PM.active = nil
         if PM.Refresh then PM.Refresh() end
-        DEFAULT_CHAT_FRAME:AddMessage("Party Memory: history, notes and favourites cleared.")
+        DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: history, notes and favourites cleared.")
     elseif input == "clear" then
-        DEFAULT_CHAT_FRAME:AddMessage("Party Memory: type /pm clear confirm to erase all saved history, notes and favourites.")
+        DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: type /pm clear confirm to erase all saved history, notes and favourites.")
     else PM.Toggle() end
 end
