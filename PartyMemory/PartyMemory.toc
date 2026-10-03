@@ -2,7 +2,7 @@
 ## Title: Party Memory
 ## Notes: Remember the people you adventure with.
 ## Author: fullstackprocrastinator
-## Version: 0.1.0
+## Version: 0.2.0
 ## SavedVariables: PartyMemoryDB
 ## DefaultState: enabled
 Store.lua

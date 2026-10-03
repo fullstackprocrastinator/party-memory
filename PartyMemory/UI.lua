@@ -1,5 +1,6 @@
 local PM = PartyMemory
-local window, search, detail, note, favourite, selected, listLabel
+local window, search, detail, note, favourite, selected, listLabel, locationsLabel
+local selectedSession, memberPage, locationPage = nil, 1, 1
 local page, filter, onlyFavourites = 1, nil, false
 local rows, memberButtons = {}, {}
 local function playerName(member)
@@ -26,22 +27,42 @@ local function showPerson(member)
     selected = member
     local person = PM.db.people[member.name] or {}
     detail:SetText(playerName(member) .. "\n" .. (member.class or "Unknown class") .. " / " .. (member.role or "NONE")
-        .. "\nSeen in " .. (person.encounters or 0) .. " recorded rosters")
+        .. "\nSeen in " .. (person.encounters or 0) .. " recorded entries")
     note:SetText(person.note or "")
     favourite:SetText(person.favourite and "Unfavourite" or "Favourite")
 end
+local function showMembers()
+    if not selectedSession then return end
+    for i, b in ipairs(memberButtons) do
+        local member = selectedSession.members[(memberPage - 1) * 4 + i]
+        if member then
+            b:SetText(playerName(member) .. (member.left and " (left)" or ""))
+            b:SetScript("OnClick", function() showPerson(member) end); b:Show()
+        else b:Hide() end
+    end
+end
+local function showLocations()
+    if not selectedSession then return end
+    local locations = selectedSession.locations or {}
+    local pages = math.max(1, math.ceil(#locations / 3))
+    locationPage = math.min(locationPage, pages)
+    local visited = {}
+    for i = (locationPage - 1) * 3 + 1, math.min(locationPage * 3, #locations) do
+        local location = locations[i]
+        visited[#visited + 1] = date("%H:%M", location.started) .. " " .. location.kind .. ": " .. location.zone
+    end
+    locationsLabel:SetText("Visited (" .. locationPage .. "/" .. pages .. "):\n"
+        .. (#visited > 0 and table.concat(visited, "\n") or selectedSession.zone))
+end
 local function showSession(session)
+    selectedSession = session; memberPage = 1; locationPage = 1
     selected = nil
     detail:SetText(session.owner .. "\n" .. session.kind .. ": " .. session.zone .. "\n"
         .. date("%d %b %Y %H:%M", session.started) .. " - " .. date("%H:%M", session.lastSeen)
         .. "\n" .. (session.difficulty or ""))
     note:SetText("")
-    for i, b in ipairs(memberButtons) do
-        local member = session.members[i]
-        if member then
-            b:SetText(playerName(member)); b:SetScript("OnClick", function() showPerson(member) end); b:Show()
-        else b:Hide() end
-    end
+    showLocations()
+    showMembers()
 end
 function PM.Refresh()
     if not window or not window:IsShown() then return end
@@ -59,6 +80,8 @@ function PM.Refresh()
             row:SetScript("OnClick", function() showSession(session) end); row:Show()
         else row:Hide() end
     end
+    showMembers()
+    showLocations()
 end
 local function build()
     window = CreateFrame("Frame", "PartyMemoryWindow", UIParent)
@@ -98,7 +121,15 @@ local function build()
     end)
     label(window, "Select a group, then a player", 500, -80, 335)
     detail = label(window, "Your recorded groups appear on the left.\nHistory starts when this addon is installed.", 500, -110, 335)
-    detail:SetFontObject("GameFontHighlight"); detail:SetHeight(90); detail:SetJustifyV("TOP")
+    detail:SetFontObject("GameFontHighlight"); detail:SetHeight(65); detail:SetJustifyV("TOP")
+    button(window, "Previous players", 500, -180, 155, function()
+        memberPage = math.max(1, memberPage - 1); showMembers()
+    end)
+    button(window, "More players", 660, -180, 170, function()
+        if selectedSession then
+            memberPage = math.min(math.max(1, math.ceil(#selectedSession.members / 4)), memberPage + 1); showMembers()
+        end
+    end)
     for i = 1, 4 do memberButtons[i] = button(window, "", 500, -210 - (i - 1) * 28, 330, function() end); memberButtons[i]:Hide() end
     label(window, "Player note (click Save note)", 500, -333, 335)
     note = CreateFrame("EditBox", nil, window, "InputBoxTemplate")
@@ -119,7 +150,17 @@ local function build()
             elseif InviteUnit then InviteUnit(selected.name) end
         end
     end)
-    label(window, "Outdoor groups are labelled Questing.\nEach roster or location change makes a new entry.\n\n/pm pause or /pm resume\n/pm clear then /pm clear confirm\n\nSaved locally. No chat messages collected.", 500, -485, 335)
+    locationsLabel = label(window, "", 500, -470, 335)
+    locationsLabel:SetHeight(75); locationsLabel:SetJustifyV("TOP"); locationsLabel:SetFontObject("GameFontHighlightSmall")
+    button(window, "Previous locations", 500, -548, 155, function()
+        locationPage = math.max(1, locationPage - 1); showLocations()
+    end)
+    button(window, "More locations", 660, -548, 170, function()
+        if selectedSession then
+            locationPage = locationPage + 1; showLocations()
+        end
+    end)
+    label(window, "One entry per continuous party.\n/pm pause or /pm resume\n/pm clear then /pm clear confirm\nSaved locally. No chat messages collected.", 500, -580, 335)
     window:SetScript("OnShow", PM.Refresh)
     window:Hide()
 end

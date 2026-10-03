@@ -76,11 +76,12 @@ class AddonTests(unittest.TestCase):
           clock=1015; PartyMemory.Capture(); assert(#PartyMemory.db.sessions==1)
           assert(PartyMemory.db.sessions[1].lastSeen==1015)
           roster[2]={name='Bob',realm='Home Realm',class='WARRIOR',role='TANK'}
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
+          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==1)
+          assert(#PartyMemory.db.sessions[1].members==2)
           roster={}; PartyMemory.Capture()
           roster={{name='Alice',realm='Other Realm',class='PRIEST',role='HEALER'}}
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==3)
-          assert(PartyMemory.db.people['Alice-OtherRealm'].encounters==3)
+          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
+          assert(PartyMemory.db.people['Alice-OtherRealm'].encounters==2)
         ''')
 
     def test_filters_notes_realms_and_reload(self):
@@ -89,7 +90,7 @@ class AddonTests(unittest.TestCase):
           zone='Deadmines'; instanceType='party'; PartyMemory.Capture()
           local p=PartyMemory.db.people['Alice-OtherRealm']; p.note='Helpful healer'; p.favourite=true
           assert(#PartyMemory.Search('HELPFUL', 'Dungeon', true)==1)
-          assert(#PartyMemory.Search('Me-HomeRealm')==2)
+          assert(#PartyMemory.Search('Me-HomeRealm')==1)
           assert(#PartyMemory.Search('%')==0)
           PartyMemory.Init(PartyMemoryDB); PartyMemory.active=nil
           assert(PartyMemory.db.people['Alice-OtherRealm'].note=='Helpful healer')
@@ -121,9 +122,52 @@ class AddonTests(unittest.TestCase):
 
     def test_ui_open_select_notes_actions_and_pagination(self):
         self.lua.execute('''
-          for i=1,12 do zone='Zone '..i; PartyMemory.Capture() end
+          for i=1,12 do zone='Zone '..i; PartyMemory.Capture(); PartyMemory.EndSession(clock) end
           SlashCmdList.PARTYMEMORY(''); assert(PartyMemoryWindow:IsShown())
           clickText('Next'); clickText('Previous')
+        ''')
+
+    def test_dungeon_round_trip_and_outdoor_party(self):
+        self.lua.execute('''
+          PartyMemory.Capture(); local s=PartyMemory.active
+          zone='Westfall'; PartyMemory.Capture()
+          assert(#PartyMemory.db.sessions==1 and s.kind=='Questing')
+          zone='Deadmines'; instanceType='party'; PartyMemory.Capture()
+          zone='Westfall'; instanceType='none'; PartyMemory.Capture()
+          assert(#PartyMemory.db.sessions==1 and s.kind=='Dungeon' and s.zone=='Deadmines')
+          assert(#s.locations==4 and #PartyMemory.Search('Elwynn')==1)
+          assert(#PartyMemory.Search('', 'Questing')==0)
+          assert(#PartyMemory.Search('', 'Dungeon')==1)
+          combat=true; roster={}; PartyMemory.Capture(); assert(PartyMemory.active==nil)
+          combat=false; roster={{name='Alice',realm='Other Realm',class='PRIEST'}}
+          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
+          assert(PartyMemory.active.kind=='Questing')
+        ''')
+
+    def test_member_replacements_and_history_pagination(self):
+        self.lua.execute('''
+          PartyMemory.Capture()
+          for i=1,6 do roster={{name='Player'..i,realm='Home Realm',class='WARRIOR'}}; PartyMemory.Capture() end
+          assert(#PartyMemory.db.sessions==1 and #PartyMemory.active.members==7)
+          assert(PartyMemory.active.members[1].left)
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; PartyMemory.Capture()
+          assert(PartyMemory.active.members[1].left==nil)
+          assert(PartyMemory.db.people['Alice-OtherRealm'].encounters==1)
+          SlashCmdList.PARTYMEMORY('')
+          for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
+          clickText('More players'); clickText('|cffc79c6ePlayer6-HomeRealm|r (left)')
+          clickText('Whisper'); assert(whispered=='Player6-HomeRealm')
+        ''')
+
+    def test_existing_saved_rosters_remain_browsable(self):
+        self.lua.execute('''
+          PartyMemoryDB=PartyMemory.Init({version=1,sessions={{id=1,owner='Old',kind='Questing',zone='OldZone',
+            started=100,lastSeen=110,members={{name='OldPlayer'}}}},nextID=2})
+          assert(#PartyMemory.Search('OldPlayer')==1)
+          SlashCmdList.PARTYMEMORY('')
+          for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
+          clickText('OldPlayer')
+          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
         ''')
         # Rows carry a FontString in .text rather than a button label.
         self.lua.execute('''

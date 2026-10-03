@@ -12,11 +12,11 @@ local function nameFor(unit)
 end
 function PM.Capture()
     if not PM.db then return end
-    -- Retail can restrict unit information during combat. Retry after combat.
-    if InCombatLockdown and InCombatLockdown() then return end
     local raid = IsInRaid and IsInRaid() or (GetNumRaidMembers and GetNumRaidMembers() > 0)
     local count = GetNumSubgroupMembers and GetNumSubgroupMembers() or (GetNumPartyMembers and GetNumPartyMembers() or 0)
-    if raid or count == 0 then PM.active = nil; return end
+    if raid or count == 0 then PM.EndSession(time()); return end
+    -- Check for leaving a party even in combat; defer restricted unit reads.
+    if InCombatLockdown and InCombatLockdown() then return end
     local members = {}
     for i = 1, count do
         local unit = "party" .. i
@@ -28,7 +28,7 @@ function PM.Capture()
     end
     local zone, instanceType, _, difficulty = GetInstanceInfo()
     if not safe(zone) or not safe(instanceType) or not safe(difficulty) then return end
-    if instanceType == "pvp" or instanceType == "arena" or instanceType == "raid" then PM.active = nil; return end
+    if instanceType == "pvp" or instanceType == "arena" or instanceType == "raid" then PM.EndSession(time()); return end
     local owner = nameFor("player")
     if not owner then return end
     PM.Record(owner, members, { kind = instanceType == "party" and "Dungeon" or "Questing",
@@ -57,7 +57,7 @@ SlashCmdList.PARTYMEMORY = function(input)
     input = string.lower(input or "")
     if input == "pause" or input == "resume" then
         PM.db.enabled = input == "resume"
-        PM.active = nil
+        PM.EndSession(time())
         DEFAULT_CHAT_FRAME:AddMessage("Party Memory: recording " .. (PM.db.enabled and "enabled." or "paused."))
         PM.Capture()
     elseif input == "clear confirm" then

@@ -18,6 +18,6 @@ Open Party Memory with /pm. History starts when the addon is installed. Outdoor 
 
 Compatibility: [replace with client versions actually tested before submission].
 
-## Release notes for 0.1.0 Alpha
+## Release notes for 0.2.0 Alpha
 
-Initial implementation of persistent party history, dungeon/questing filters, search, favourites, notes, whisper and invite actions. Automated Lua tests provided; in-game validation required before promoting to Release.
+One entry per continuous party, retaining members and locations as the group changes. Entering and leaving a dungeon no longer creates duplicate entries; outdoor-only groups remain Questing. Added player and location pagination, while preserving older history and class colours. Automated Lua tests provided; in-game validation required before promoting to Release.
