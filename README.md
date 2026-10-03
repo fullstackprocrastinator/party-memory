@@ -21,7 +21,7 @@ Commands: `/pm pause`, `/pm resume`, `/pm clear` (shows confirmation instruction
 
 ## Client compatibility and limitations
 
-The default TOC targets Retail interface 120007. Verify your installed client's interface with `/dump select(4, GetBuildInfo())`; update the TOC when needed. A legacy 3.3.5 package can be built with `pwsh -File scripts/package.ps1 -Client 335` (interface 30300). The exact WoW Forever client has not yet been confirmed. These are compatibility targets, not claims of in-game certification. Private-server modifications may require adjustments.
+The default packaging command creates a **WoW Forever** ZIP for client 1.60.1, build 70205, interface **40601**, as reported by the user's client. Use this ZIP for Forever. The source TOC targets Retail interface 120007; build that package explicitly with `pwsh -File scripts/package.ps1 -Client Retail`. A legacy 3.3.5 package can be built with `pwsh -File scripts/package.ps1 -Client 335` (interface 30300). These are compatibility targets, not claims of in-game certification. Private-server modifications may require adjustments.
 
 Outdoor parties are labelled **Questing**; the addon does not infer whether quests are actually being completed. Each roster or location change creates a new entry, and revisiting a roster creates another. Counts measure recorded rosters, not unique dungeon completions. Raid, arena and battleground groups are excluded. Names are stored with realms; same-named characters on different realms remain separate.
 
