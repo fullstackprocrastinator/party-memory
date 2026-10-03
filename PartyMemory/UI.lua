@@ -2,6 +2,15 @@ local PM = PartyMemory
 local window, search, detail, note, favourite, selected, listLabel
 local page, filter, onlyFavourites = 1, nil, false
 local rows, memberButtons = {}, {}
+local function playerName(member)
+    local person = PM.db.people[member.name]
+    local class = member.class or (person and person.class)
+    local colour = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if not colour then return member.name end
+    return string.format("|cff%02x%02x%02x%s|r",
+        math.floor(colour.r * 255 + 0.5), math.floor(colour.g * 255 + 0.5),
+        math.floor(colour.b * 255 + 0.5), member.name)
+end
 local function button(parent, text, x, y, width, action)
     local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     b:SetSize(width, 24); b:SetPoint("TOPLEFT", x, y); b:SetText(text)
@@ -16,7 +25,7 @@ end
 local function showPerson(member)
     selected = member
     local person = PM.db.people[member.name] or {}
-    detail:SetText(member.name .. "\n" .. (member.class or "Unknown class") .. " / " .. (member.role or "NONE")
+    detail:SetText(playerName(member) .. "\n" .. (member.class or "Unknown class") .. " / " .. (member.role or "NONE")
         .. "\nSeen in " .. (person.encounters or 0) .. " recorded rosters")
     note:SetText(person.note or "")
     favourite:SetText(person.favourite and "Unfavourite" or "Favourite")
@@ -30,7 +39,7 @@ local function showSession(session)
     for i, b in ipairs(memberButtons) do
         local member = session.members[i]
         if member then
-            b:SetText(member.name); b:SetScript("OnClick", function() showPerson(member) end); b:Show()
+            b:SetText(playerName(member)); b:SetScript("OnClick", function() showPerson(member) end); b:Show()
         else b:Hide() end
     end
 end
@@ -44,7 +53,7 @@ function PM.Refresh()
         local session = results[(page - 1) * 9 + i]
         if session then
             local names = {}
-            for _, member in ipairs(session.members) do names[#names + 1] = member.name end
+            for _, member in ipairs(session.members) do names[#names + 1] = playerName(member) end
             row.text:SetText(date("%d %b %Y %H:%M", session.started) .. " | " .. session.kind .. "\n"
                 .. session.zone .. "\n" .. table.concat(names, ", "))
             row:SetScript("OnClick", function() showSession(session) end); row:Show()

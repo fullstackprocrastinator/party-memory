@@ -7,6 +7,7 @@ Remember the people you adventure with. Party Memory automatically records dunge
 - Persistent, account-wide history of party rosters, with your character, date, location and dungeon difficulty.
 - Search by player, your character, location or personal note.
 - Dungeon and questing filters, favourites and player notes.
+- Player names use your client's class colours in history, member buttons and player details.
 - Click a recorded player to open a whisper or send a party invitation.
 - Pause recording and explicitly clear your history when wanted.
 - No dependencies, chat logging, telemetry or external data transmission.

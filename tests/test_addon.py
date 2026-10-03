@@ -12,6 +12,7 @@ clock = 1000
 time = function() return clock end
 date = function(fmt, value) return os.date(fmt, value) end
 UIParent = {}; UISpecialFrames = {}; SlashCmdList = {}
+RAID_CLASS_COLORS = { PRIEST={r=1,g=1,b=1}, WARRIOR={r=0.78,g=0.61,b=0.43} }
 DEFAULT_CHAT_FRAME = {AddMessage = function() end}
 frames = {}; buttons = {}; combat = false; raid = false
 roster = { {name='Alice',realm='Other Realm',class='PRIEST',role='HEALER'} }
@@ -127,7 +128,7 @@ class AddonTests(unittest.TestCase):
         # Rows carry a FontString in .text rather than a button label.
         self.lua.execute('''
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
-          clickText('Alice-OtherRealm'); clickText('Favourite')
+          clickText('|cffffffffAlice-OtherRealm|r'); clickText('Favourite')
           for _,f in ipairs(frames) do if f.kind=='EditBox' then f:SetText('A great healer') end end
           clickText('Save note'); assert(PartyMemory.db.people['Alice-OtherRealm'].note=='A great healer')
           clickText('Whisper'); assert(whispered=='Alice-OtherRealm')
