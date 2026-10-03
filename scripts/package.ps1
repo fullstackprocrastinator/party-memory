@@ -8,7 +8,7 @@ Copy-Item -LiteralPath (Join-Path $root 'PartyMemory') -Destination $stage -Recu
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination (Join-Path $stage 'PartyMemory/LICENSE') -Force
 if ($Client -eq '335' -or $Client -eq 'Forever') {
     $toc = Join-Path $stage 'PartyMemory/PartyMemory.toc'
-    $interface = if ($Client -eq 'Forever') { '40601' } else { '30300' }
+    $interface = if ($Client -eq 'Forever') { '16001' } else { '30300' }
     (Get-Content -LiteralPath $toc -Raw).Replace('120007', $interface) | Set-Content -LiteralPath $toc -Encoding utf8
 }
 $zip = Join-Path $destination "PartyMemory-0.1.0-$Client.zip"
