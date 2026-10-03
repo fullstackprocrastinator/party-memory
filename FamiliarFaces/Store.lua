@@ -1,5 +1,5 @@
-PartyMemory = PartyMemory or {}
-local PM = PartyMemory
+FamiliarFaces = FamiliarFaces or {}
+local PM = FamiliarFaces
 
 function PM.Init(db)
     db = db or {}

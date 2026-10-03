@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.2.1 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.2.2 · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -36,26 +36,26 @@ Join a party and the addon remembers who was there, when you played, and where y
 
 Install packages are available as artifacts from successful [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml). Open a completed run, download **FamiliarFaces-install-packages**, then extract the artifact archive to find the client ZIPs. GitHub may require you to sign in to download artifacts.
 
-For WoW Forever, choose **`FamiliarFaces-0.2.1-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
+For WoW Forever, choose **`FamiliarFaces-0.2.2-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
 
 ### Install
 
 1. Close WoW.
-2. Extract the client ZIP and place its **`PartyMemory`** folder into your game's **`Interface/AddOns`** directory.
+2. Extract the client ZIP and place its **`FamiliarFaces`** folder into your game's **`Interface/AddOns`** directory.
 3. Restart the game and enable **Familiar Faces** in the character-selection AddOns menu.
 4. Log in, type **`/ff`**, and join a party. Recording starts automatically; allow up to 15 seconds for the next periodic capture.
 
 ```text
 Interface/
 └── AddOns/
-    └── PartyMemory/
-        ├── PartyMemory.toc
+    └── FamiliarFaces/
+        ├── FamiliarFaces.toc
         ├── Core.lua
         ├── Store.lua
         └── UI.lua
 ```
 
-**Upgrading?** Replace the files inside the existing `PartyMemory` folder. The addon was previously named Party Memory; its internal folder and saved-data name remain unchanged so history, notes and favourites survive the rename. Do not rename the folder or install a second copy.
+**Upgrading from a Party Memory test build?** Close WoW, remove the old `PartyMemory` addon folder from `Interface/AddOns`, and install `FamiliarFaces` instead. The new addon uses its own saved-data name and starts with fresh history; old test history is not imported. Keep only one addon copy installed. Future Familiar Faces updates can replace files inside the existing `FamiliarFaces` folder.
 
 ### Use it
 
@@ -90,7 +90,7 @@ Familiar Faces includes **no chat logging, telemetry or automatic data sharing**
 WoW writes this data on normal logout or reload. To back it up, copy:
 
 ```text
-WTF/Account/<account>/SavedVariables/PartyMemory.lua
+WTF/Account/<account>/SavedVariables/FamiliarFaces.lua
 ```
 
 Keep that file private when reporting bugs. The distribution ZIP contains code and the license, not your personal history. History stays until you clear it; very large journals can take more memory and time to search.

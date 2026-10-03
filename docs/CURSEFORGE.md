@@ -1,7 +1,7 @@
 # CurseForge release checklist
 
 1. Confirm the intended game client. Test the addon in that client using TESTING.md, and set its exact interface number in the TOC. Keep private-server-only packages separately labelled; do not claim support for official clients you have not tested.
-2. Run `pwsh -File scripts/package.ps1 -Client Retail` for Retail, or `-Client 335` for legacy 3.3.5. The default command produces a WoW Forever package (interface 16001); do not label it as an official Retail release. Inspect the generated ZIP: its root must contain the PartyMemory folder, with the TOC and Lua files inside.
+2. Run `pwsh -File scripts/package.ps1 -Client Retail` for Retail, or `-Client 335` for legacy 3.3.5. The default command produces a WoW Forever package (interface 16001); do not label it as an official Retail release. Inspect the generated ZIP: its root must contain the FamiliarFaces folder, with the TOC and Lua files inside.
 3. Create a World of Warcraft project at https://authors.curseforge.com/ with the name **Familiar Faces**. Suggested category: Chat & Communication or Miscellaneous (use the current available categories). Select MIT as the license and use the GitHub repository for source and issues.
 4. Add an original project avatar and screenshots from the actual game. Use the description below and clearly identify tested client versions.
 5. Upload the correct ZIP, select the matching official game version and release type. Start with Alpha while in-game testing is incomplete. A Release file is required for CurseForge App distribution after approval. Submit for moderation.
@@ -18,6 +18,6 @@ Open Familiar Faces with /pm. History starts when the addon is installed. Outdoo
 
 Compatibility: [replace with client versions actually tested before submission].
 
-## Release notes for 0.2.1 Alpha
+## Release notes for 0.2.2 Alpha
 
-Renamed to Familiar Faces, with new /ff and /familiarfaces commands. Existing /pm commands and saved history remain compatible. One entry per continuous party, retaining members and locations as the group changes. Entering and leaving a dungeon no longer creates duplicate entries; outdoor-only groups remain Questing. Player and location pagination and class colours are included. Automated Lua tests provided; in-game validation required before promoting to Release.
+Renamed the installation folder, TOC and saved-data namespace to FamiliarFaces before public rollout. Remove the old PartyMemory addon folder when upgrading from test builds; test history is not imported. Open with /ff or /familiarfaces; older /pm command aliases still work. Includes one entry per continuous party, member and location history, player notes, favourites and class colours.

@@ -1,4 +1,4 @@
-local PM = PartyMemory
+local PM = FamiliarFaces
 local frame = CreateFrame("Frame")
 local function safe(value)
     return value ~= nil and (not issecretvalue or not issecretvalue(value))
@@ -42,7 +42,7 @@ for _, event in ipairs({"PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE", "PARTY_M
 end
 frame:SetScript("OnEvent", function(_, event, name)
     if event == "ADDON_LOADED" then
-        if name == "PartyMemory" then PartyMemoryDB = PM.Init(PartyMemoryDB) end
+        if name == "FamiliarFaces" then FamiliarFacesDB = PM.Init(FamiliarFacesDB) end
     else PM.Capture() end
 end)
 local elapsed = 0
@@ -50,11 +50,11 @@ frame:SetScript("OnUpdate", function(_, delta)
     elapsed = elapsed + delta
     if elapsed >= 15 then elapsed = 0; PM.Capture() end
 end)
-SLASH_PARTYMEMORY1 = "/pm"
-SLASH_PARTYMEMORY2 = "/partymemory"
-SLASH_PARTYMEMORY3 = "/ff"
-SLASH_PARTYMEMORY4 = "/familiarfaces"
-SlashCmdList.PARTYMEMORY = function(input)
+SLASH_FAMILIARFACES1 = "/pm"
+SLASH_FAMILIARFACES2 = "/partymemory"
+SLASH_FAMILIARFACES3 = "/ff"
+SLASH_FAMILIARFACES4 = "/familiarfaces"
+SlashCmdList.FAMILIARFACES = function(input)
     if not PM.db then return end
     input = string.lower(input or "")
     if input == "pause" or input == "resume" then
@@ -63,7 +63,7 @@ SlashCmdList.PARTYMEMORY = function(input)
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: recording " .. (PM.db.enabled and "enabled." or "paused."))
         PM.Capture()
     elseif input == "clear confirm" then
-        PartyMemoryDB = PM.Init({enabled = PM.db.enabled})
+        FamiliarFacesDB = PM.Init({enabled = PM.db.enabled})
         PM.active = nil
         if PM.Refresh then PM.Refresh() end
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: history, notes and favourites cleared.")

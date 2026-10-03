@@ -2,8 +2,8 @@
 ## Title: Familiar Faces
 ## Notes: Remember the people you adventure with.
 ## Author: fullstackprocrastinator
-## Version: 0.2.1
-## SavedVariables: PartyMemoryDB
+## Version: 0.2.2
+## SavedVariables: FamiliarFacesDB
 ## DefaultState: enabled
 Store.lua
 Core.lua

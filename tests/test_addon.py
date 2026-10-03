@@ -67,47 +67,47 @@ class AddonTests(unittest.TestCase):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.lua.execute(MOCKS)
         for name in ('Store.lua', 'Core.lua', 'UI.lua'):
-            self.lua.execute((ROOT / 'PartyMemory' / name).read_text(encoding='utf-8'))
-        self.lua.execute("frames[1].scripts.OnEvent(frames[1], 'ADDON_LOADED', 'PartyMemory')")
+            self.lua.execute((ROOT / 'FamiliarFaces' / name).read_text(encoding='utf-8'))
+        self.lua.execute("frames[1].scripts.OnEvent(frames[1], 'ADDON_LOADED', 'FamiliarFaces')")
 
     def test_roster_sessions_and_history(self):
         self.lua.execute('''
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==1)
-          clock=1015; PartyMemory.Capture(); assert(#PartyMemory.db.sessions==1)
-          assert(PartyMemory.db.sessions[1].lastSeen==1015)
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==1)
+          clock=1015; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==1)
+          assert(FamiliarFaces.db.sessions[1].lastSeen==1015)
           roster[2]={name='Bob',realm='Home Realm',class='WARRIOR',role='TANK'}
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==1)
-          assert(#PartyMemory.db.sessions[1].members==2)
-          roster={}; PartyMemory.Capture()
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==1)
+          assert(#FamiliarFaces.db.sessions[1].members==2)
+          roster={}; FamiliarFaces.Capture()
           roster={{name='Alice',realm='Other Realm',class='PRIEST',role='HEALER'}}
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
-          assert(PartyMemory.db.people['Alice-OtherRealm'].encounters==2)
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==2)
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==2)
         ''')
 
     def test_filters_notes_realms_and_reload(self):
         self.lua.execute('''
-          PartyMemory.Capture()
-          zone='Deadmines'; instanceType='party'; PartyMemory.Capture()
-          local p=PartyMemory.db.people['Alice-OtherRealm']; p.note='Helpful healer'; p.favourite=true
-          assert(#PartyMemory.Search('HELPFUL', 'Dungeon', true)==1)
-          assert(#PartyMemory.Search('Me-HomeRealm')==1)
-          assert(#PartyMemory.Search('%')==0)
-          PartyMemory.Init(PartyMemoryDB); PartyMemory.active=nil
-          assert(PartyMemory.db.people['Alice-OtherRealm'].note=='Helpful healer')
-          roster[1].realm='Third Realm'; PartyMemory.Capture()
-          assert(PartyMemory.db.people['Alice-ThirdRealm'])
+          FamiliarFaces.Capture()
+          zone='Deadmines'; instanceType='party'; FamiliarFaces.Capture()
+          local p=FamiliarFaces.db.people['Alice-OtherRealm']; p.note='Helpful healer'; p.favourite=true
+          assert(#FamiliarFaces.Search('HELPFUL', 'Dungeon', true)==1)
+          assert(#FamiliarFaces.Search('Me-HomeRealm')==1)
+          assert(#FamiliarFaces.Search('%')==0)
+          FamiliarFaces.Init(FamiliarFacesDB); FamiliarFaces.active=nil
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Helpful healer')
+          roster[1].realm='Third Realm'; FamiliarFaces.Capture()
+          assert(FamiliarFaces.db.people['Alice-ThirdRealm'])
         ''')
 
     def test_pause_unknown_combat_and_exclusions(self):
         self.lua.execute('''
-          combat=true; PartyMemory.Capture(); assert(#PartyMemory.db.sessions==0)
-          combat=false; roster[1].name='Unknown'; PartyMemory.Capture(); assert(#PartyMemory.db.sessions==0)
-          roster[1].name='Alice'; raid=true; PartyMemory.Capture(); assert(#PartyMemory.db.sessions==0)
-          raid=false; instanceType='pvp'; PartyMemory.Capture(); assert(#PartyMemory.db.sessions==0)
-          instanceType='none'; SlashCmdList.PARTYMEMORY('pause'); assert(#PartyMemory.db.sessions==0)
-          SlashCmdList.PARTYMEMORY('resume'); assert(#PartyMemory.db.sessions==1)
-          SlashCmdList.PARTYMEMORY('clear'); assert(#PartyMemory.db.sessions==1)
-          SlashCmdList.PARTYMEMORY('clear confirm'); assert(#PartyMemory.db.sessions==0)
+          combat=true; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          combat=false; roster[1].name='Unknown'; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          roster[1].name='Alice'; raid=true; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          raid=false; instanceType='pvp'; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          instanceType='none'; SlashCmdList.FAMILIARFACES('pause'); assert(#FamiliarFaces.db.sessions==0)
+          SlashCmdList.FAMILIARFACES('resume'); assert(#FamiliarFaces.db.sessions==1)
+          SlashCmdList.FAMILIARFACES('clear'); assert(#FamiliarFaces.db.sessions==1)
+          SlashCmdList.FAMILIARFACES('clear confirm'); assert(#FamiliarFaces.db.sessions==0)
         ''')
 
     def test_legacy_api_and_event_fallbacks(self):
@@ -115,45 +115,45 @@ class AddonTests(unittest.TestCase):
           GetNumPartyMembers=GetNumSubgroupMembers; GetNumSubgroupMembers=nil
           GetNumRaidMembers=function() return 0 end; IsInRaid=nil
           UnitGroupRolesAssigned=nil; C_PartyInfo=nil; InviteUnit=function(n) invited=n end
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==1)
-          assert(PartyMemory.db.sessions[1].members[1].role=='NONE')
-          SlashCmdList.PARTYMEMORY(''); assert(PartyMemoryWindow:IsShown())
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==1)
+          assert(FamiliarFaces.db.sessions[1].members[1].role=='NONE')
+          SlashCmdList.FAMILIARFACES(''); assert(FamiliarFacesWindow:IsShown())
         ''')
 
     def test_ui_open_select_notes_actions_and_pagination(self):
         self.lua.execute('''
-          for i=1,12 do zone='Zone '..i; PartyMemory.Capture(); PartyMemory.EndSession(clock) end
-          SlashCmdList.PARTYMEMORY(''); assert(PartyMemoryWindow:IsShown())
+          for i=1,12 do zone='Zone '..i; FamiliarFaces.Capture(); FamiliarFaces.EndSession(clock) end
+          SlashCmdList.FAMILIARFACES(''); assert(FamiliarFacesWindow:IsShown())
           clickText('Next'); clickText('Previous')
         ''')
 
     def test_dungeon_round_trip_and_outdoor_party(self):
         self.lua.execute('''
-          PartyMemory.Capture(); local s=PartyMemory.active
-          zone='Westfall'; PartyMemory.Capture()
-          assert(#PartyMemory.db.sessions==1 and s.kind=='Questing')
-          zone='Deadmines'; instanceType='party'; PartyMemory.Capture()
-          zone='Westfall'; instanceType='none'; PartyMemory.Capture()
-          assert(#PartyMemory.db.sessions==1 and s.kind=='Dungeon' and s.zone=='Deadmines')
-          assert(#s.locations==4 and #PartyMemory.Search('Elwynn')==1)
-          assert(#PartyMemory.Search('', 'Questing')==0)
-          assert(#PartyMemory.Search('', 'Dungeon')==1)
-          combat=true; roster={}; PartyMemory.Capture(); assert(PartyMemory.active==nil)
+          FamiliarFaces.Capture(); local s=FamiliarFaces.active
+          zone='Westfall'; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==1 and s.kind=='Questing')
+          zone='Deadmines'; instanceType='party'; FamiliarFaces.Capture()
+          zone='Westfall'; instanceType='none'; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==1 and s.kind=='Dungeon' and s.zone=='Deadmines')
+          assert(#s.locations==4 and #FamiliarFaces.Search('Elwynn')==1)
+          assert(#FamiliarFaces.Search('', 'Questing')==0)
+          assert(#FamiliarFaces.Search('', 'Dungeon')==1)
+          combat=true; roster={}; FamiliarFaces.Capture(); assert(FamiliarFaces.active==nil)
           combat=false; roster={{name='Alice',realm='Other Realm',class='PRIEST'}}
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
-          assert(PartyMemory.active.kind=='Questing')
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==2)
+          assert(FamiliarFaces.active.kind=='Questing')
         ''')
 
     def test_member_replacements_and_history_pagination(self):
         self.lua.execute('''
-          PartyMemory.Capture()
-          for i=1,6 do roster={{name='Player'..i,realm='Home Realm',class='WARRIOR'}}; PartyMemory.Capture() end
-          assert(#PartyMemory.db.sessions==1 and #PartyMemory.active.members==7)
-          assert(PartyMemory.active.members[1].left)
-          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; PartyMemory.Capture()
-          assert(PartyMemory.active.members[1].left==nil)
-          assert(PartyMemory.db.people['Alice-OtherRealm'].encounters==1)
-          SlashCmdList.PARTYMEMORY('')
+          FamiliarFaces.Capture()
+          for i=1,6 do roster={{name='Player'..i,realm='Home Realm',class='WARRIOR'}}; FamiliarFaces.Capture() end
+          assert(#FamiliarFaces.db.sessions==1 and #FamiliarFaces.active.members==7)
+          assert(FamiliarFaces.active.members[1].left)
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; FamiliarFaces.Capture()
+          assert(FamiliarFaces.active.members[1].left==nil)
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==1)
+          SlashCmdList.FAMILIARFACES('')
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
           clickText('More players'); clickText('|cffc79c6ePlayer6-HomeRealm|r (left)')
           clickText('Whisper'); assert(whispered=='Player6-HomeRealm')
@@ -161,25 +161,25 @@ class AddonTests(unittest.TestCase):
 
     def test_existing_saved_rosters_remain_browsable(self):
         self.lua.execute('''
-          PartyMemoryDB=PartyMemory.Init({version=1,sessions={{id=1,owner='Old',kind='Questing',zone='OldZone',
+          FamiliarFacesDB=FamiliarFaces.Init({version=1,sessions={{id=1,owner='Old',kind='Questing',zone='OldZone',
             started=100,lastSeen=110,members={{name='OldPlayer'}}}},nextID=2})
-          assert(#PartyMemory.Search('OldPlayer')==1)
-          SlashCmdList.PARTYMEMORY('')
+          assert(#FamiliarFaces.Search('OldPlayer')==1)
+          SlashCmdList.FAMILIARFACES('')
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
           clickText('OldPlayer')
-          PartyMemory.Capture(); assert(#PartyMemory.db.sessions==2)
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==2)
         ''')
         # Rows carry a FontString in .text rather than a button label.
         self.lua.execute('''
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
           clickText('|cffffffffAlice-OtherRealm|r'); clickText('Favourite')
           for _,f in ipairs(frames) do if f.kind=='EditBox' then f:SetText('A great healer') end end
-          clickText('Save note'); assert(PartyMemory.db.people['Alice-OtherRealm'].note=='A great healer')
+          clickText('Save note'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='A great healer')
           clickText('Whisper'); assert(whispered=='Alice-OtherRealm')
           combat=true; clickText('Invite'); assert(invited==nil)
           combat=false; clickText('Invite'); assert(invited=='Alice-OtherRealm')
-          clickText('Close'); assert(not PartyMemoryWindow:IsShown())
-          SlashCmdList.PARTYMEMORY(''); assert(PartyMemoryWindow:IsShown())
+          clickText('Close'); assert(not FamiliarFacesWindow:IsShown())
+          SlashCmdList.FAMILIARFACES(''); assert(FamiliarFacesWindow:IsShown())
         ''')
 
 if __name__ == '__main__':

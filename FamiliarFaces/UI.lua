@@ -1,4 +1,4 @@
-local PM = PartyMemory
+local PM = FamiliarFaces
 local window, search, detail, note, favourite, selected, listLabel, locationsLabel
 local selectedSession, memberPage, locationPage = nil, 1, 1
 local page, filter, onlyFavourites = 1, nil, false
@@ -84,13 +84,13 @@ function PM.Refresh()
     showLocations()
 end
 local function build()
-    window = CreateFrame("Frame", "PartyMemoryWindow", UIParent)
+    window = CreateFrame("Frame", "FamiliarFacesWindow", UIParent)
     window:SetSize(860, 650); window:SetPoint("CENTER"); window:SetFrameStrata("DIALOG")
     local bg = window:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetTexture("Interface\\Buttons\\WHITE8X8"); bg:SetVertexColor(0.035, 0.045, 0.065, 0.97)
     window:SetMovable(true); window:EnableMouse(true); window:RegisterForDrag("LeftButton")
     window:SetScript("OnDragStart", window.StartMoving); window:SetScript("OnDragStop", window.StopMovingOrSizing)
     window:SetClampedToScreen(true)
-    table.insert(UISpecialFrames, "PartyMemoryWindow")
+    table.insert(UISpecialFrames, "FamiliarFacesWindow")
     label(window, "FAMILIAR FACES", 20, -18, 700)
     label(window, "Remember the people you adventure with", 20, -42, 700)
     button(window, "Close", 775, -14, 65, function() window:Hide() end)
