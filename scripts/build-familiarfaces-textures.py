@@ -1,18 +1,13 @@
-"""Export a clean serif wordmark as an uncompressed WoW-compatible TGA."""
+"""Export the stylised transparent wordmark as a WoW-compatible TGA."""
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
-
+from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
-image = Image.new('RGBA', (1024, 256), (0, 0, 0, 0))
-draw = ImageDraw.Draw(image)
-font_path = Path('C:/Windows/Fonts/georgia.ttf')
-if not font_path.exists():
-    raise SystemExit('Georgia font required for this branding export.')
-font = ImageFont.truetype(str(font_path), 115)
-draw.text((512, 128), 'Familiar Faces', font=font, fill=(244, 193, 99, 255), anchor='mm')
-destination = ROOT / 'FamiliarFaces' / 'Textures'
+source = Image.open(ROOT / 'assets/branding/familiar-faces-ui/stylised-wordmark.png').convert('RGBA')
+source = source.crop(source.getchannel('A').getbbox())
+source.thumbnail((504, 120), Image.Resampling.LANCZOS)
+image = Image.new('RGBA', (512, 128), (0, 0, 0, 0))
+image.paste(source, ((512-source.width)//2, (128-source.height)//2))
+destination = ROOT / 'FamiliarFaces/Textures'
 destination.mkdir(parents=True, exist_ok=True)
-image.resize((512, 128), Image.Resampling.LANCZOS).save(destination / 'Wordmark.tga', compression=None)
-preview = ROOT / 'assets' / 'branding' / 'familiar-faces-ui'
-preview.mkdir(parents=True, exist_ok=True)
-image.save(preview / 'wordmark.png')
+image.save(destination / 'Wordmark.tga', compression=None)
+image.save(ROOT / 'assets/branding/familiar-faces-ui/wordmark.png')
