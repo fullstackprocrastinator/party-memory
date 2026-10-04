@@ -46,6 +46,8 @@ function CreateFrame(kind,name,parent,template)
   StartMoving=noop, StopMovingOrSizing=noop, SetClampedToScreen=noop,
   SetHighlightTexture=noop, SetAutoFocus=noop, SetMaxLetters=noop,
   ClearFocus=noop, SetAllPoints=noop, SetTexture=noop, SetVertexColor=noop,
+  SetTextColor=noop,
+  SetFocus=noop, HighlightText=noop,
   SetText=function(self,t) self.text=t; if self.scripts.OnTextChanged then self.scripts.OnTextChanged(self) end end,
   GetText=function(self) return self.text end,
   IsShown=function(self) return self.visible end,
@@ -210,6 +212,19 @@ class AddonTests(unittest.TestCase):
           combat=false; clickText('Invite'); assert(invited=='Alice-OtherRealm')
           clickText('Close'); assert(not FamiliarFacesWindow:IsShown())
           SlashCmdList.FAMILIARFACES(''); assert(FamiliarFacesWindow:IsShown())
+        ''')
+
+    def test_creator_credit_link(self):
+        self.lua.execute('''
+          SlashCmdList.FAMILIARFACES(''); clickText('Created by SqueezyLemons')
+          local link
+          for _,f in ipairs(frames) do
+            if f.kind=='EditBox' and f.text=='https://www.curseforge.com/members/squeezylemons/projects' then link=f end
+          end
+          assert(link and link:IsShown())
+          link.scripts.OnEscapePressed(link)
+          clickText('Created by SqueezyLemons')
+          assert(link:GetText()=='https://www.curseforge.com/members/squeezylemons/projects')
         ''')
 
 if __name__ == '__main__':

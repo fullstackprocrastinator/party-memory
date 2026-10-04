@@ -14,10 +14,17 @@ Ever finish a great dungeon run and forget the name of the person who made it fu
 
 It records dungeon and outdoor parties, including names, realms, dates and locations. Browse your previous groups, search for a player, add a personal note and favourite someone you'd like to play with again. Select a player to whisper or invite them through the game's normal social functions.
 
-Open Familiar Faces with /pm. History starts when the addon is installed. Outdoor parties are labelled Questing. Raid and battleground groups are excluded. Everything is saved locally in your WoW account; no chat messages or telemetry are collected. Pause recording with /pm pause and resume with /pm resume.
+Open Familiar Faces with /ff or /familiarfaces. History starts when the addon is installed. Outdoor parties are labelled Questing. Raid and battleground groups are excluded. Everything is saved locally in your WoW account; no chat messages or telemetry are collected. Pause recording with /ff pause and resume with /ff resume.
 
 Compatibility: [replace with client versions actually tested before submission].
 
 ## Release notes for 0.3.0 Alpha
 
 Redesigned the journal with Adventures and Companions tabs, sortable tables, activity/class/favourites/notes filters, and a linked detail panel. Browse every shared adventure from a player's profile, read notes in row tooltips, and resize the window. The charcoal and gold interface adds alternating rows and clear selection highlights. Existing FamiliarFaces history, notes and favourites are preserved. Open with /ff or /familiarfaces.
+
+## Release notes for 0.3.1
+
+- A warmer journal design with a gold serif wordmark, teal panels, gold borders and native game icons.
+- Clearer selected rows, highlighted tabs and a welcoming empty journal.
+- Added Created by SqueezyLemons. Click the credit to copy the creator's CurseForge projects link.
+- Existing history, notes and favourites are preserved. Commands remain /ff and /familiarfaces.
