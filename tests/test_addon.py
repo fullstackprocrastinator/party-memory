@@ -34,10 +34,13 @@ ChatFrame_SendTell = function(name) whispered=name end
 C_PartyInfo = {InviteUnit=function(name) invited=name end}
 local noop = function() end
 function CreateFrame(kind,name,parent,template)
- local f = {scripts={},visible=true,text='',kind=kind}
+ local f = {scripts={},visible=true,text='',kind=kind,width=1120,height=760}
  local methods = {
   SetScript=function(self,event,fn) self.scripts[event]=fn end,
-  RegisterEvent=noop, SetSize=noop, SetPoint=noop, SetWidth=noop,
+  RegisterEvent=noop, SetSize=function(self,w,h) self.width=w; self.height=h end, SetPoint=noop,
+  SetWidth=function(self,w) self.width=w end, GetWidth=function(self) return self.width end,
+  GetHeight=function(self) return self.height end, ClearAllPoints=noop,
+  SetResizable=noop, SetResizeBounds=noop, StartSizing=noop,
   SetHeight=noop, SetJustifyH=noop, SetJustifyV=noop, SetFontObject=noop,
   SetFrameStrata=noop, SetMovable=noop, EnableMouse=noop, RegisterForDrag=noop,
   StartMoving=noop, StopMovingOrSizing=noop, SetClampedToScreen=noop,
@@ -57,7 +60,7 @@ function CreateFrame(kind,name,parent,template)
  return f
 end
 function clickText(text)
- for _,b in ipairs(buttons) do if b.text==text then b.scripts.OnClick(b); return end end
+ for _,b in ipairs(buttons) do if b.caption==text or b.text==text then b.scripts.OnClick(b); return end end
  error('Missing button: '..text)
 end
 '''
@@ -82,6 +85,33 @@ class AddonTests(unittest.TestCase):
           roster={{name='Alice',realm='Other Realm',class='PRIEST',role='HEALER'}}
           FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==2)
           assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==2)
+        ''')
+
+    def test_companion_filters_sorting_and_shared_history(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); FamiliarFaces.EndSession(clock)
+          roster={{name='Bob',realm='Home Realm',class='WARRIOR'}}
+          zone='Deadmines'; instanceType='party'; clock=2000; FamiliarFaces.Capture()
+          local alice=FamiliarFaces.db.people['Alice-OtherRealm']; alice.note='Helpful healer'; alice.favourite=true
+          local list=FamiliarFaces.Query('Companions',{sort='name',ascending=true})
+          assert(#list==2 and list[1]==alice)
+          assert(#FamiliarFaces.Query('Companions',{kind='Dungeon',notes=true})==0)
+          assert(#FamiliarFaces.Query('Companions',{class='PRIEST',favourites=true,notes=true})==1)
+          assert(#FamiliarFaces.Query('Companions',{query='Deadmines'})==1)
+          assert(#FamiliarFaces.Query('Adventures',{query='Helpful',class='WARRIOR'})==0)
+          assert(FamiliarFaces.Query('Adventures',{sort='started'})[1].zone=='Deadmines')
+          assert(FamiliarFaces.Query('Adventures',{sort='started',ascending=true})[1].zone=='Elwynn Forest')
+          SlashCmdList.FAMILIARFACES(''); clickText('Companions')
+          for _,b in ipairs(buttons) do if b.entry==alice then b.scripts.OnClick(b); break end end
+          clickText('Whisper'); assert(whispered=='Alice-OtherRealm')
+          clickText('01 Jan  Elwynn Forest')
+          clickText('|cffffffffAlice-OtherRealm|r')
+          clickText('Unfavourite'); assert(not alice.favourite)
+          clickText('Clear filters')
+          FamiliarFacesWindow:SetSize(1300,900); FamiliarFacesWindow.scripts.OnSizeChanged()
+          for _,b in ipairs(buttons) do if b.entry then assert(b:GetWidth()==900) end end
+          SlashCmdList.FAMILIARFACES('clear confirm')
+          clickText('Save note'); assert(#FamiliarFaces.db.sessions==0)
         ''')
 
     def test_filters_notes_realms_and_reload(self):

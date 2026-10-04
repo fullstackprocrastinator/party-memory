@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.2.2 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.3.0 · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -30,13 +30,19 @@ Join a party and the addon remembers who was there, when you played, and where y
 | **Reconnect** | Select a player to open a whisper or send an invitation through the game's normal social functions. |
 | **Read at a glance** | Class-coloured names, with pages for previous players and visited locations. |
 
+### Two ways to explore your journal
+
+**Adventures** shows a sortable table of parties: date, activity, location, companions and duration. **Companions** shows unique players: class-coloured name, class, times together, last seen and note preview. Select a companion to browse every adventure you shared; click an adventure to return to its party details.
+
+Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. The charcoal interface uses restrained gold accents, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
+
 ## Getting started
 
 ### Download
 
 Install packages are available as artifacts from successful [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml). Open a completed run, download **FamiliarFaces-install-packages**, then extract the artifact archive to find the client ZIPs. GitHub may require you to sign in to download artifacts.
 
-For WoW Forever, choose **`FamiliarFaces-0.2.2-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
+For WoW Forever, choose **`FamiliarFaces-0.3.0-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
 
 ### Install
 
@@ -59,7 +65,7 @@ Interface/
 
 ### Use it
 
-Select a group, then select a player to save a note, favourite them, whisper or invite. Use **More players** and **More locations** to explore the whole entry. Invitations and whispers remain subject to the game's permissions, online status and cross-realm restrictions.
+Select an adventure to browse its companions and location timeline, or open **Companions** to find a player directly. The detail panel links players and shared adventures and provides notes, favourites, whisper and invite actions. Use its paging controls to explore longer histories. Invitations and whispers remain subject to the game's permissions, online status and cross-realm restrictions.
 
 ## Commands
 

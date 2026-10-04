@@ -86,3 +86,56 @@ function PM.Search(query, kind, favourites)
     end
     return results
 end
+
+-- The two browsers share filters, but companion filters apply to that person.
+function PM.Query(view, options)
+    options = options or {}
+    local results, seen = {}, {}
+    local query = string.lower(options.query or "")
+    for _, session in ipairs(PM.db.sessions) do
+        local locationText = session.zone .. " " .. session.owner .. " " .. session.kind
+        for _, location in ipairs(session.locations or {}) do locationText = locationText .. " " .. location.zone end
+        local matchingMember, matchesQuery = false, string.find(string.lower(locationText), query, 1, true) ~= nil
+        for _, member in ipairs(session.members) do
+            local person = PM.db.people[member.name] or {name = member.name, class = member.class}
+            local eligible = (not options.class or (person.class or member.class) == options.class)
+                and (not options.favourites or person.favourite)
+                and (not options.notes or (person.note and person.note:match("%S")))
+            local personMatch = string.find(string.lower(member.name .. " " .. (person.note or "")), query, 1, true) ~= nil
+            if eligible then
+                matchingMember = true
+                if personMatch then matchesQuery = true end
+            end
+            if view == "Companions" and eligible and (personMatch or string.find(string.lower(locationText), query, 1, true))
+                and (not options.kind or session.kind == options.kind) and not seen[member.name] then
+                seen[member.name] = true
+                results[#results + 1] = person
+            end
+        end
+        if view == "Adventures" and matchingMember and matchesQuery and (not options.kind or session.kind == options.kind) then
+            results[#results + 1] = session
+        end
+    end
+    local function value(item)
+        local key = options.sort
+        if view == "Companions" then
+            if key == "name" then return string.lower(item.name) end
+            if key == "class" then return item.class or "" end
+            if key == "encounters" then return item.encounters or 0 end
+            if key == "note" then return string.lower(item.note or "") end
+            if key == "favourite" then return item.favourite and 1 or 0 end
+            return item.lastSeen or 0
+        end
+        if key == "kind" then return item.kind end
+        if key == "zone" then return string.lower(item.zone) end
+        if key == "members" then return #item.members end
+        if key == "duration" then return math.max(0, (item.ended or item.lastSeen) - item.started) end
+        return item.started
+    end
+    table.sort(results, function(a, b)
+        local av, bv = value(a), value(b)
+        if av == bv then return tostring(a.id or a.name) < tostring(b.id or b.name) end
+        if options.ascending then return av < bv else return av > bv end
+    end)
+    return results
+end

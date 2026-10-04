@@ -18,6 +18,6 @@ Open Familiar Faces with /pm. History starts when the addon is installed. Outdoo
 
 Compatibility: [replace with client versions actually tested before submission].
 
-## Release notes for 0.2.2 Alpha
+## Release notes for 0.3.0 Alpha
 
-Renamed the installation folder, TOC and saved-data namespace to FamiliarFaces before public rollout. Remove the old PartyMemory addon folder when upgrading from test builds; test history is not imported. Open with /ff or /familiarfaces; older /pm command aliases still work. Includes one entry per continuous party, member and location history, player notes, favourites and class colours.
+Redesigned the journal with Adventures and Companions tabs, sortable tables, activity/class/favourites/notes filters, and a linked detail panel. Browse every shared adventure from a player's profile, read notes in row tooltips, and resize the window. The charcoal and gold interface adds alternating rows and clear selection highlights. Existing FamiliarFaces history, notes and favourites are preserved. Open with /ff or /familiarfaces.
