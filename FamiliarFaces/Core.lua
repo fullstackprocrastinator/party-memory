@@ -1,5 +1,10 @@
 local PM = FamiliarFaces
 local frame = CreateFrame("Frame")
+function PM.NotifyReunion(name, previous, person)
+    local note = person and person.note
+    DEFAULT_CHAT_FRAME:AddMessage("|cffe8bd72Familiar Faces:|r You've met "..name.." before - "..previous.zone..", "..date("%d %b",previous.lastSeen).."."
+        ..(note and note:match("%S") and (" Note: "..note) or ""))
+end
 local function safe(value)
     return value ~= nil and (not issecretvalue or not issecretvalue(value))
 end
@@ -59,15 +64,20 @@ SlashCmdList.FAMILIARFACES = function(input)
     input = string.lower(input or "")
     if input == "pause" or input == "resume" then
         PM.db.enabled = input == "resume"
-        PM.EndSession(time())
+        PM.EndSession(time(),true)
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: recording " .. (PM.db.enabled and "enabled." or "paused."))
         PM.Capture()
     elseif input == "clear confirm" then
-        FamiliarFacesDB = PM.Init({enabled = PM.db.enabled})
-        PM.active = nil
+        local enabled,notices,first=PM.db.enabled,PM.db.reunionNotices,PM.db.favouritesFirst
+        PM.EndSession(time())
+        FamiliarFacesDB = PM.Init({enabled = enabled,reunionNotices=notices,favouritesFirst=first})
         if PM.Refresh then PM.Refresh() end
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: history, notes and favourites cleared.")
     elseif input == "clear" then
-        DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: type /pm clear confirm to erase all saved history, notes and favourites.")
+        DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: type /ff clear confirm to erase all saved history, notes and favourites.")
+    elseif input == "notices" then
+        PM.db.reunionNotices=not PM.db.reunionNotices
+        DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: reunion notices "..(PM.db.reunionNotices and "on." or "off."))
+        if PM.Refresh then PM.Refresh() end
     else PM.Toggle() end
 end

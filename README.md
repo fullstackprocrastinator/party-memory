@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.3.2 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.4.0 · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -29,12 +29,18 @@ Join a party and the addon remembers who was there, when you played, and where y
 | **Make it personal** | Keep notes and favourites for each player, shared across your characters in the same account/client. |
 | **Reconnect** | Select a player to open a whisper or send an invitation through the game's normal social functions. |
 | **Read at a glance** | Class-coloured names, with pages for previous players and visited locations. |
+| **Recognise a reunion** | Optional chat notices recall your previous adventure and note, once per companion per party. |
+| **Remember where you met** | See each companion's last adventure and keep favourites at the top. |
+| **Quick personal notes** | Add Helpful, Patient or Great company to your note draft, then save it. |
+| **Choose what to keep** | Forget individual adventures or companions with confirmation and updated encounter counts. |
 
 ### Two ways to explore your journal
 
-**Adventures** shows a sortable table of parties: date, activity, location, companions and duration. **Companions** shows unique players: class-coloured name, class, times together, last seen and note preview. Select a companion to browse every adventure you shared; click an adventure to return to its party details.
+**Adventures** shows a sortable table of parties: date, activity, location, companions and duration. **Companions** shows unique players: class-coloured name, class, times together, last adventure and last seen. Select a companion to browse every adventure you shared; click an adventure to return to its party details.
 
-Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. The charcoal interface uses restrained gold accents, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
+Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Toggle saved **Favourites first** and **Reunion notices** preferences at the top. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
+
+See the [complete addon description](docs/DESCRIPTION.md) and [0.4.0 changelog](CHANGELOG.md) for the new features and forgetting behaviour.
 
 ## Getting started
 
@@ -42,7 +48,7 @@ Use the activity and class buttons to cycle through their filters, toggle favour
 
 Install packages are available as artifacts from successful [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml). Open a completed run, download **FamiliarFaces-install-packages**, then extract the artifact archive to find the client ZIPs. GitHub may require you to sign in to download artifacts.
 
-For WoW Forever, choose **`FamiliarFaces-0.3.2-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
+For WoW Forever, choose **`FamiliarFaces-0.4.0-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
 
 ### Install
 
@@ -74,6 +80,7 @@ Select an adventure to browse its companions and location timeline, or open **Co
 | `/ff` or `/familiarfaces` | Open or close the window. |
 | `/ff pause` | Pause recording. |
 | `/ff resume` | Resume recording. |
+| `/ff notices` | Toggle reunion chat notices. |
 | `/ff clear` | Show instructions for clearing saved data. |
 | `/ff clear confirm` | Erase all saved history, notes and favourites. |
 

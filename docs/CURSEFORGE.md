@@ -10,6 +10,8 @@ Official guidance: https://support.curseforge.com/support/solutions/articles/900
 
 ## Suggested project description
 
+Use the complete current copy in [DESCRIPTION.md](DESCRIPTION.md). The text below is the original short introduction.
+
 Ever finish a great dungeon run and forget the name of the person who made it fun? Familiar Faces keeps a personal journal of the people you group with.
 
 It records dungeon and outdoor parties, including names, realms, dates and locations. Browse your previous groups, search for a player, add a personal note and favourite someone you'd like to play with again. Select a player to whisper or invite them through the game's normal social functions.
@@ -28,3 +30,7 @@ Redesigned the journal with Adventures and Companions tabs, sortable tables, act
 - Clearer selected rows, highlighted tabs and a welcoming empty journal.
 - Added Created by SqueezyLemons. Click the credit to copy the creator's CurseForge projects link.
 - Existing history, notes and favourites are preserved. Commands remain /ff and /familiarfaces.
+
+## Release notes for 0.4.0
+
+See [CHANGELOG.md](../CHANGELOG.md) for the release notes. Upload `FamiliarFaces-0.4.0-Forever.zip` for WoW Forever 1.60.1. The four feature images in `assets/curseforge/` are labelled sample-data previews, rather than in-game captures.

@@ -8,6 +8,7 @@ local activityButton, classButton, favouritesButton, notesButton, tabs = nil, ni
 local classes = {}
 local refreshDetails, layout
 local creatorDialog, creatorURL
+local pendingForget, forgetDialog, forgetMessage, forgetButton, firstButton, noticesButton
 local function showCreator()
     if not creatorDialog then
         creatorDialog=CreateFrame("Frame",nil,window); creatorDialog:SetSize(620,140); creatorDialog:SetPoint("CENTER"); creatorDialog:EnableMouse(true)
@@ -64,8 +65,28 @@ local function button(parent,text,x,y,width,fn)
     b:SetText(text); b:SetScript("OnClick",fn)
     return b
 end
+local function askForget()
+    pendingForget=selectedPerson and {person=selectedPerson.name} or (selectedSession and {session=selectedSession})
+    if not pendingForget then return end
+    if not forgetDialog then
+        forgetDialog=CreateFrame("Frame",nil,window); forgetDialog:SetSize(600,180); forgetDialog:SetPoint("CENTER"); forgetDialog:EnableMouse(true)
+        forgetDialog:SetFrameStrata("FULLSCREEN_DIALOG")
+        fill(forgetDialog,0.025,0.065,0.085); border(forgetDialog)
+        forgetMessage=label(forgetDialog,"",20,-20,560,"GameFontHighlight"); forgetMessage:SetHeight(100)
+        button(forgetDialog,"Cancel",20,-135,160,function() forgetDialog:Hide(); pendingForget=nil end)
+        button(forgetDialog,"Confirm forget",390,-135,190,function()
+            if pendingForget then
+                if pendingForget.person then PM.ForgetPerson(pendingForget.person) else PM.ForgetAdventure(pendingForget.session) end
+            end
+            pendingForget=nil; selectedPerson=nil; selectedSession=nil; note:SetText(""); forgetDialog:Hide(); PM.Refresh()
+        end)
+    end
+    forgetMessage:SetText(pendingForget.person and ("Forget "..pendingForget.person.."?\nRemoves their notes, favourite and appearances in your history.\nOther companions are kept. They can be recorded in a future party.")
+        or "Forget this adventure?\nRemoves this entry and updates encounter counts.\nCompanion notes and favourites are kept.\nAn active party will not be recorded again until it ends.")
+    forgetDialog:Show()
+end
 local adventureColumns = {{"Date","started",0},{"Activity","kind",0.22},{"Adventure","zone",0.39},{"People","members",0.76},{"Time","duration",0.88}}
-local companionColumns = {{"Companion","name",0},{"Class","class",0.40},{"Together","encounters",0.58},{"Last seen","lastSeen",0.72},{"Note","note",0.88}}
+local companionColumns = {{"Companion","name",0},{"Class","class",0.32},{"Together","encounters",0.46},{"Last adventure","adventure",0.59},{"Last seen","lastSeen",0.83}}
 local function columns() return view=="Adventures" and adventureColumns or companionColumns end
 local function duration(session)
     local minutes = math.floor(math.max(0,(session.ended or session.lastSeen)-session.started)/60)
@@ -98,7 +119,8 @@ refreshDetails = function()
     end
     if selectedPerson then
         heading:SetText(colourName(selectedPerson))
-        summary:SetText((selectedPerson.class or "Unknown class").."\n"..(selectedPerson.encounters or 0).." shared entries\nLast together: "..date("%d %b %Y %H:%M",selectedPerson.lastSeen or 0))
+        local last=PM.LastAdventure(selectedPerson.name)
+        summary:SetText((selectedPerson.class or "Unknown class").."\n"..(selectedPerson.encounters or 0).." shared entries\nLast adventure: "..(last and last.zone or "No saved adventures").."\nLast together: "..(selectedPerson.lastSeen and date("%d %b %Y %H:%M",selectedPerson.lastSeen) or "Unknown"))
     elseif selectedSession then
         heading:SetText(selectedSession.zone)
         summary:SetText(selectedSession.kind.." | "..(selectedSession.difficulty or "").."\n"..date("%d %b %Y %H:%M",selectedSession.started).." | "..duration(selectedSession).."\n"..selectedSession.owner)
@@ -107,6 +129,8 @@ refreshDetails = function()
         summary:SetText("Select an adventure or companion.\n\nNew parties appear automatically.\nYour notes and favourites stay local.")
     end
     for _,b in ipairs(actions) do if selectedPerson then b:Show() else b:Hide() end end
+    if selectedPerson or selectedSession then forgetButton:Show() else forgetButton:Hide() end
+    forgetButton:SetText(selectedPerson and "Forget companion" or "Forget adventure")
     if selectedPerson then note:Show(); panel.noteLabel:Show() else note:Hide(); panel.noteLabel:Hide() end
     for _,b in ipairs({panel.previousLinks,panel.nextLinks}) do
         if selectedPerson or selectedSession then b:Show() else b:Hide() end
@@ -148,6 +172,9 @@ local function visibleRows() return math.max(1,math.min(16,math.floor((window:Ge
 function PM.Refresh()
     if not window or not window:IsShown() then return end
     options.query=search:GetText()
+    options.favouritesFirst=PM.db.favouritesFirst
+    firstButton:SetText("Favourites first: "..(PM.db.favouritesFirst and "on" or "off"))
+    noticesButton:SetText("Reunion notices: "..(PM.db.reunionNotices and "on" or "off"))
     local results=PM.Query(view,options)
     local count=visibleRows(); local pages=math.max(1,math.ceil(#results/count)); page=math.min(page,pages)
     for name,b in pairs(tabs) do
@@ -171,7 +198,8 @@ function PM.Refresh()
                 or (item.kind=="Dungeon" and "Interface\\Icons\\INV_Misc_Key_03" or "Interface\\Icons\\INV_Misc_Map_01"))
             local cells
             if view=="Adventures" then cells={date("%d %b %H:%M",item.started),item.kind,item.zone,tostring(#item.members),duration(item)}
-            else cells={colourName(item)..(item.favourite and " |cffe8bd72*|r" or ""),item.class or "Unknown",tostring(item.encounters or 0),date("%d %b %H:%M",item.lastSeen or 0),item.note and item.note:match("%S") and item.note or "-"} end
+            else local last=PM.LastAdventure(item.name)
+                cells={colourName(item)..(item.favourite and " |cffe8bd72*|r" or ""),item.class or "Unknown",tostring(item.encounters or 0),last and last.zone or "-",item.lastSeen and date("%d %b %H:%M",item.lastSeen) or "-"} end
             for j,f in ipairs(row.cells) do
                 f:ClearAllPoints(); f:SetPoint("TOPLEFT",(j==1 and 29 or 8)+tableWidth*cols[j][3],-9)
                 f:SetWidth(math.max(20,tableWidth*((cols[j+1] and cols[j+1][3] or 1)-cols[j][3])-(j==1 and 33 or 12))); f:SetText(cells[j])
@@ -182,6 +210,8 @@ function PM.Refresh()
                 GameTooltip:SetOwner(row,"ANCHOR_RIGHT")
                 if view=="Companions" then
                     GameTooltip:SetText(item.name); GameTooltip:AddLine(item.note or "No personal note",1,1,1,true)
+                    local last=PM.LastAdventure(item.name)
+                    if last then GameTooltip:AddLine("Last adventure: "..last.zone.." | "..date("%d %b %Y %H:%M",last.lastSeen),1,1,1,true) end
                 else
                     GameTooltip:SetText(item.zone)
                     for _,member in ipairs(item.members) do GameTooltip:AddLine(colourName(member)) end
@@ -217,6 +247,8 @@ local function build()
     label(window,"Remember the people you adventure with.",117,-103,500)
     headerStatus=label(window,"",770,-65,300,"GameFontNormal")
     button(window,"Created by SqueezyLemons",770,-89,300,showCreator)
+    firstButton=button(window,"",310,-122,195,function() PM.db.favouritesFirst=not PM.db.favouritesFirst; page=1; PM.Refresh() end)
+    noticesButton=button(window,"",515,-122,195,function() PM.db.reunionNotices=not PM.db.reunionNotices; PM.Refresh() end)
     local close=button(window,"Close",0,0,70,function() window:Hide() end)
     close:ClearAllPoints(); close:SetPoint("TOPRIGHT",-20,-20)
     for i,name in ipairs({"Adventures","Companions"}) do
@@ -296,7 +328,17 @@ local function build()
             if C_PartyInfo and C_PartyInfo.InviteUnit then C_PartyInfo.InviteUnit(selectedPerson.name) elseif InviteUnit then InviteUnit(selectedPerson.name) end
         end
     end)
-    panel.timeline=label(panel,"",14,-486,310); panel.timeline:SetHeight(75); panel.timeline:SetJustifyV("TOP")
+    for i,text in ipairs({"Helpful","Patient","Great company"}) do
+        actions[#actions+1]=button(panel,text,14+(i-1)*105,-478,100,function()
+            if selectedPerson then
+                local current=note:GetText()
+                if not string.find(current,text,1,true) then note:SetText((current:match("%S") and current.."; " or "")..text) end
+            end
+        end)
+    end
+    forgetButton=button(panel,"Forget adventure",14,-603,312,askForget)
+    panel:SetHeight(646)
+    panel.timeline=label(panel,"",14,-510,310); panel.timeline:SetHeight(60); panel.timeline:SetJustifyV("TOP")
     panel.previousLocations=button(panel,"Previous locations",14,-575,150,function() locationPage=math.max(1,locationPage-1); refreshDetails() end)
     panel.nextLocations=button(panel,"More locations",170,-575,156,function() locationPage=locationPage+1; refreshDetails() end)
     local resize=button(window,"Resize",0,0,65,function() end); resize:ClearAllPoints(); resize:SetPoint("BOTTOMRIGHT",-10,10)
@@ -308,6 +350,7 @@ local function build()
         PM.Refresh()
     end
     window:SetScript("OnSizeChanged",layout); window:SetScript("OnShow",layout); window:Hide()
+    window:SetScript("OnHide",function() if forgetDialog then forgetDialog:Hide() end; pendingForget=nil end)
 end
 function PM.Toggle()
     if not window then build() end

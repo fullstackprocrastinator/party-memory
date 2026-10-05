@@ -15,6 +15,7 @@ function CreateFrame(kind,name,parent,template)
  f.SetPoint=function(self,p,x,y) if not self.anchor then self.anchor=p; self.x=x or 0; self.y=-(y or 0) end end
  f.ClearAllPoints=function(self) self.anchor=nil end
  f.SetHeight=function(self,h) self.height=h end
+ f.SetFrameStrata=function(self,s) self.strata=s end
  f.SetAllPoints=function(self) self.allPoints=true end
  f.SetTexture=function(self,p) self.texture=p end
  f.SetVertexColor=function(self,r,g,b,a) self.color={r,g,b,a or 1} end
@@ -64,6 +65,7 @@ def render(state):
   if 'BOTTOM' in anchor: y+=ph-h
   if anchor=='CENTER': x+=(pw-w)/2; y+=(ph-h)/2
   css=[f'left:{x}px',f'top:{y}px']
+  if f['strata']=='FULLSCREEN_DIALOG': css.append('z-index:50')
   if w: css.append(f'width:{w}px')
   if h: css.append(f'height:{h}px')
   body=''; kind=f['kind']

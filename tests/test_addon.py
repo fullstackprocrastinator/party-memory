@@ -227,6 +227,72 @@ class AddonTests(unittest.TestCase):
           assert(link:GetText()=='https://www.curseforge.com/members/squeezylemons/projects')
         ''')
 
+    def test_reunion_notices_once_and_toggle(self):
+        self.lua.execute('''
+          messages={}; DEFAULT_CHAT_FRAME.AddMessage=function(_,text) if text:find("You've met",1,true) then messages[#messages+1]=text end end
+          FamiliarFaces.Capture(); assert(#messages==0)
+          FamiliarFaces.db.people['Alice-OtherRealm'].note='Patient healer'
+          roster={}; FamiliarFaces.Capture()
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}
+          clock=2000; FamiliarFaces.Capture(); FamiliarFaces.Capture()
+          assert(#messages==1 and messages[1]:find('Elwynn Forest',1,true) and messages[1]:find('Patient healer',1,true))
+          SlashCmdList.FAMILIARFACES('pause'); SlashCmdList.FAMILIARFACES('resume')
+          assert(#messages==1)
+          roster={}; FamiliarFaces.Capture(); FamiliarFaces.db.reunionNotices=false
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; FamiliarFaces.Capture()
+          assert(#messages==1)
+        ''')
+
+    def test_last_adventure_and_favourite_first(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); FamiliarFaces.EndSession(clock)
+          FamiliarFaces.db.people['Alice-OtherRealm'].favourite=true
+          clock=2000; zone='Deadmines'; instanceType='party'
+          roster={{name='Bob',realm='Home Realm',class='WARRIOR'}}; FamiliarFaces.Capture()
+          assert(FamiliarFaces.LastAdventure('Alice-OtherRealm').zone=='Elwynn Forest')
+          local list=FamiliarFaces.Query('Companions',{sort='lastSeen',favouritesFirst=true})
+          assert(list[1].name=='Alice-OtherRealm')
+          list=FamiliarFaces.Query('Companions',{sort='lastSeen',favouritesFirst=false})
+          assert(list[1].name=='Bob-HomeRealm')
+        ''')
+
+    def test_forget_adventure_preserves_profiles_and_active_suppression(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); local session=FamiliarFaces.active
+          local person=FamiliarFaces.db.people['Alice-OtherRealm']; person.note='Helpful'; person.favourite=true
+          assert(FamiliarFaces.ForgetAdventure(session)); FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==0 and person.encounters==0 and person.note=='Helpful' and person.favourite)
+          assert(#FamiliarFaces.Query('Companions',{})==1)
+          assert(#FamiliarFaces.Query('Companions',{kind='Dungeon'})==0)
+          roster={}; FamiliarFaces.Capture(); roster={{name='Alice',realm='Other Realm',class='PRIEST'}}
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==1 and person.encounters==1)
+        ''')
+
+    def test_forget_person_removes_history_and_recounts_others(self):
+        self.lua.execute('''
+          roster[2]={name='Bob',realm='Home Realm',class='WARRIOR'}
+          FamiliarFaces.Capture(); FamiliarFaces.EndSession(clock)
+          clock=2000; FamiliarFaces.Capture()
+          assert(FamiliarFaces.ForgetPerson('Alice-OtherRealm')); FamiliarFaces.Capture()
+          assert(FamiliarFaces.db.people['Alice-OtherRealm']==nil)
+          assert(#FamiliarFaces.db.sessions==2 and #FamiliarFaces.db.sessions[1].members==1)
+          assert(FamiliarFaces.db.people['Bob-HomeRealm'].encounters==2)
+          roster={}; FamiliarFaces.Capture(); roster={{name='Alice',realm='Other Realm',class='PRIEST'}}
+          FamiliarFaces.Capture(); assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==1)
+        ''')
+
+    def test_quick_notes_and_confirmed_forget(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); SlashCmdList.FAMILIARFACES(''); clickText('Companions')
+          for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end
+          clickText('Helpful'); clickText('Helpful'); clickText('Patient'); clickText('Save note')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Helpful; Patient')
+          clickText('Forget companion'); clickText('Cancel')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'])
+          clickText('Forget companion'); clickText('Confirm forget')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm']==nil and #FamiliarFaces.db.sessions==0)
+        ''')
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 
