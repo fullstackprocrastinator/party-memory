@@ -9,6 +9,7 @@ local classes = {}
 local refreshDetails, layout
 local creatorDialog, creatorURL
 local pendingForget, forgetDialog, forgetMessage, forgetButton, firstButton, noticesButton
+local nickname, draftDialog, pendingNavigation, allowHide, daysButton, partyButton, minimapToggle
 local function showCreator()
     if not creatorDialog then
         creatorDialog=CreateFrame("Frame",nil,window); creatorDialog:SetSize(620,140); creatorDialog:SetPoint("CENTER"); creatorDialog:EnableMouse(true)
@@ -65,6 +66,46 @@ local function button(parent,text,x,y,width,fn)
     b:SetText(text); b:SetScript("OnClick",fn)
     return b
 end
+local function dirty()
+    return selectedPerson and (note:GetText()~=(selectedPerson.note or "") or nickname:GetText()~=(selectedPerson.nickname or ""))
+end
+local function saveDraft()
+    if selectedPerson then selectedPerson.note=note:GetText(); selectedPerson.nickname=nickname:GetText(); note:ClearFocus(); nickname:ClearFocus() end
+end
+local function guard(fn)
+    if not dirty() then fn(); return end
+    if pendingNavigation then return end
+    pendingNavigation=fn
+    if not draftDialog then
+        draftDialog=CreateFrame("Frame",nil,window); draftDialog:SetSize(540,150); draftDialog:SetPoint("CENTER"); draftDialog:EnableMouse(true); draftDialog:SetFrameStrata("FULLSCREEN_DIALOG")
+        fill(draftDialog,0.025,0.065,0.085); border(draftDialog)
+        label(draftDialog,"You have unsaved notes or a nickname.\nSave your changes before moving on?",20,-25,500,"GameFontHighlight")
+        local function finish(save,discard)
+            if save then saveDraft() elseif discard and selectedPerson then note:SetText(selectedPerson.note or ""); nickname:SetText(selectedPerson.nickname or "") end
+            local nextAction=pendingNavigation; pendingNavigation=nil; draftDialog:Hide()
+            if nextAction then nextAction() end
+        end
+        button(draftDialog,"Save",20,-105,150,function() finish(true) end)
+        button(draftDialog,"Discard",190,-105,150,function() finish(false,true) end)
+        button(draftDialog,"Cancel",360,-105,150,function() pendingNavigation=nil; draftDialog:Hide() end)
+    end
+    draftDialog:Show()
+end
+function PM.SaveWindow()
+    if not window then return end
+    local placement={width=window:GetWidth(),height=window:GetHeight()}
+    if window.GetCenter and UIParent.GetCenter then
+        local x,y=window:GetCenter(); local cx,cy=UIParent:GetCenter()
+        if x and y and cx and cy then placement.x=x-cx; placement.y=y-cy end
+    end
+    PM.db.window=placement
+end
+function PM.ResetWindow()
+    if window then window:ClearAllPoints(); window:SetPoint("CENTER"); window:SetSize(1120,880); PM.SaveWindow() end
+end
+function PM.Close()
+    guard(function() allowHide=true; PM.SaveWindow(); window:Hide(); allowHide=false end)
+end
 local function askForget()
     pendingForget=selectedPerson and {person=selectedPerson.name} or (selectedSession and {session=selectedSession})
     if not pendingForget then return end
@@ -93,12 +134,17 @@ local function duration(session)
     return minutes < 60 and (minutes.."m") or (math.floor(minutes/60).."h "..(minutes%60).."m")
 end
 local function selectSession(session)
-    selectedSession=session; selectedPerson=nil; linkPage=1; locationPage=1
-    note:SetText(""); PM.Refresh()
+    guard(function()
+        selectedSession=session; selectedPerson=nil; linkPage=1; locationPage=1
+        note:SetText(""); nickname:SetText(""); PM.Refresh()
+    end)
 end
 local function selectPerson(person)
-    selectedPerson=person; linkPage=1
-    note:SetText(person.note or ""); PM.Refresh()
+    if selectedPerson==person then return end
+    guard(function()
+        selectedPerson=person; selectedSession=nil; linkPage=1
+        note:SetText(person.note or ""); nickname:SetText(person.nickname or ""); PM.Refresh()
+    end)
 end
 local function related()
     if selectedPerson then
@@ -131,7 +177,8 @@ refreshDetails = function()
     for _,b in ipairs(actions) do if selectedPerson then b:Show() else b:Hide() end end
     if selectedPerson or selectedSession then forgetButton:Show() else forgetButton:Hide() end
     forgetButton:SetText(selectedPerson and "Forget companion" or "Forget adventure")
-    if selectedPerson then note:Show(); panel.noteLabel:Show() else note:Hide(); panel.noteLabel:Hide() end
+    if selectedPerson then note:Show(); nickname:Show(); panel.nicknameLabel:Show(); panel.noteLabel:Show() else note:Hide(); nickname:Hide(); panel.nicknameLabel:Hide(); panel.noteLabel:Hide() end
+    panel.noteLabel:SetText(dirty() and "Personal note - unsaved changes" or "A little note for next time")
     for _,b in ipairs({panel.previousLinks,panel.nextLinks}) do
         if selectedPerson or selectedSession then b:Show() else b:Hide() end
     end
@@ -151,7 +198,7 @@ refreshDetails = function()
         if entry then
             if selectedPerson then
                 b:SetText(date("%d %b",entry.started).."  "..entry.zone)
-                b:SetScript("OnClick",function() view="Adventures"; options.sort="started"; page=1; selectSession(entry) end)
+                b:SetScript("OnClick",function() guard(function() view="Adventures"; options.sort="started"; page=1; selectSession(entry) end) end)
             else
                 b:SetText(colourName(entry)..(entry.left and " (left)" or ""))
                 b:SetScript("OnClick",function() selectPerson(PM.db.people[entry.name] or entry) end)
@@ -173,6 +220,9 @@ function PM.Refresh()
     if not window or not window:IsShown() then return end
     options.query=search:GetText()
     options.favouritesFirst=PM.db.favouritesFirst
+    daysButton:SetText("When: "..(options.days and ("Last "..options.days.." days") or "Any time"))
+    partyButton:SetText(options.currentParty and "In your party: on" or "In your party: off")
+    minimapToggle:SetText("Minimap: "..(PM.db.minimap.hidden and "off" or "on"))
     firstButton:SetText("Favourites first: "..(PM.db.favouritesFirst and "on" or "off"))
     noticesButton:SetText("Reunion notices: "..(PM.db.reunionNotices and "on" or "off"))
     local results=PM.Query(view,options)
@@ -184,7 +234,7 @@ function PM.Refresh()
     local cols=columns(); local tableWidth=window:GetWidth()-400
     for i,h in ipairs(headers) do
         local c=cols[i]; h:SetText(c[1]..(options.sort==c[2] and (options.ascending and " +" or " -") or ""))
-        h:ClearAllPoints(); h:SetPoint("TOPLEFT",20+tableWidth*c[3],-238)
+        h:ClearAllPoints(); h:SetPoint("TOPLEFT",20+tableWidth*c[3],-274)
         h:SetWidth(tableWidth*((cols[i+1] and cols[i+1][3] or 1)-c[3]))
     end
     for i,row in ipairs(rows) do
@@ -199,17 +249,19 @@ function PM.Refresh()
             local cells
             if view=="Adventures" then cells={date("%d %b %H:%M",item.started),item.kind,item.zone,tostring(#item.members),duration(item)}
             else local last=PM.LastAdventure(item.name)
-                cells={colourName(item)..(item.favourite and " |cffe8bd72*|r" or ""),item.class or "Unknown",tostring(item.encounters or 0),last and last.zone or "-",item.lastSeen and date("%d %b %H:%M",item.lastSeen) or "-"} end
+                cells={colourName(item)..(item.favourite and " |cffe8bd72*|r" or "")..(PM.currentParty and PM.currentParty[item.name] and " |cff70cc97[party]|r" or ""),item.class or "Unknown",tostring(item.encounters or 0),last and last.zone or "-",item.lastSeen and date("%d %b %H:%M",item.lastSeen) or "-"} end
             for j,f in ipairs(row.cells) do
                 f:ClearAllPoints(); f:SetPoint("TOPLEFT",(j==1 and 29 or 8)+tableWidth*cols[j][3],-9)
                 f:SetWidth(math.max(20,tableWidth*((cols[j+1] and cols[j+1][3] or 1)-cols[j][3])-(j==1 and 33 or 12))); f:SetText(cells[j])
             end
-            row:SetScript("OnClick",function() if view=="Adventures" then selectSession(item) else selectedSession=nil; selectPerson(item) end end)
+            row:SetScript("OnClick",function() if view=="Adventures" then selectSession(item) else selectPerson(item) end end)
             row:SetScript("OnEnter",function()
                 if not GameTooltip then return end
                 GameTooltip:SetOwner(row,"ANCHOR_RIGHT")
                 if view=="Companions" then
                     GameTooltip:SetText(item.name); GameTooltip:AddLine(item.note or "No personal note",1,1,1,true)
+                    if item.nickname and item.nickname~="" then GameTooltip:AddLine("Nickname: "..item.nickname,1,1,1,true) end
+                    if PM.currentParty and PM.currentParty[item.name] then GameTooltip:AddLine("In your party",0.44,0.80,0.59) end
                     local last=PM.LastAdventure(item.name)
                     if last then GameTooltip:AddLine("Last adventure: "..last.zone.." | "..date("%d %b %Y %H:%M",last.lastSeen),1,1,1,true) end
                 else
@@ -232,13 +284,16 @@ function PM.Refresh()
 end
 local function build()
     window=CreateFrame("Frame","FamiliarFacesWindow",UIParent)
-    window:SetSize(1120,820); window:SetPoint("CENTER"); window:SetFrameStrata("DIALOG")
+    local placement=PM.db.window or {}
+    window:SetSize(math.max(1100,math.min(1500,placement.width or 1120)),math.max(880,math.min(1100,placement.height or 880)))
+    if placement.x and placement.y then window:SetPoint("CENTER",UIParent,"CENTER",placement.x,placement.y) else window:SetPoint("CENTER") end
+    window:SetFrameStrata("DIALOG")
     fill(window,0.025,0.065,0.085,0.99); border(window)
     window:SetMovable(true); window:EnableMouse(true); window:RegisterForDrag("LeftButton")
-    window:SetScript("OnDragStart",window.StartMoving); window:SetScript("OnDragStop",window.StopMovingOrSizing)
+    window:SetScript("OnDragStart",window.StartMoving); window:SetScript("OnDragStop",function() window:StopMovingOrSizing(); PM.SaveWindow() end)
     window:SetClampedToScreen(true); window:SetResizable(true)
-    if window.SetResizeBounds then window:SetResizeBounds(1100,820,1500,1000)
-    elseif window.SetMinResize then window:SetMinResize(1100,820); window:SetMaxResize(1500,1000) end
+    if window.SetResizeBounds then window:SetResizeBounds(1100,880,1500,1100)
+    elseif window.SetMinResize then window:SetMinResize(1100,880); window:SetMaxResize(1500,1100) end
     table.insert(UISpecialFrames,"FamiliarFacesWindow")
     local emblem=CreateFrame("Frame",nil,window); emblem:SetSize(74,74); emblem:SetPoint("TOPLEFT",24,-24)
     fill(emblem,0.13,0.20,0.21); border(emblem)
@@ -249,7 +304,7 @@ local function build()
     button(window,"Created by SqueezyLemons",770,-89,300,showCreator)
     firstButton=button(window,"",310,-122,195,function() PM.db.favouritesFirst=not PM.db.favouritesFirst; page=1; PM.Refresh() end)
     noticesButton=button(window,"",515,-122,195,function() PM.db.reunionNotices=not PM.db.reunionNotices; PM.Refresh() end)
-    local close=button(window,"Close",0,0,70,function() window:Hide() end)
+    local close=button(window,"Close",0,0,70,PM.Close)
     close:ClearAllPoints(); close:SetPoint("TOPRIGHT",-20,-20)
     for i,name in ipairs({"Adventures","Companions"}) do
         tabs[name]=button(window,name,20+(i-1)*145,-122,135,function()
@@ -279,16 +334,19 @@ local function build()
         options.notes=not options.notes; notesButton:SetText(options.notes and "Notes: on" or "Notes: off"); page=1; PM.Refresh()
     end)
     button(window,"Clear filters",588,-202,125,function()
-        options.kind=nil; options.class=nil; options.favourites=false; options.notes=false; page=1
+        options.kind=nil; options.class=nil; options.favourites=false; options.notes=false; options.days=nil; options.currentParty=false; page=1
         activityButton:SetText("Activity: All"); classButton:SetText("Class: All"); favouritesButton:SetText("Favourites: off"); notesButton:SetText("Notes: off"); search:SetText(""); PM.Refresh()
     end)
+    daysButton=button(window,"",20,-238,190,function() options.days=options.days==nil and 7 or (options.days==7 and 30 or nil); page=1; PM.Refresh() end)
+    partyButton=button(window,"",220,-238,190,function() options.currentParty=not options.currentParty; page=1; PM.Refresh() end)
+    minimapToggle=button(window,"",420,-238,145,function() PM.db.minimap.hidden=not PM.db.minimap.hidden; PM.InitMinimap(); PM.Refresh() end)
     for i=1,5 do headers[i]=button(window,"",0,-194,100,function()
         local key=columns()[i][2]
         if options.sort==key then options.ascending=not options.ascending else options.sort=key; options.ascending=key=="name" or key=="zone" or key=="class" end
         page=1; PM.Refresh()
     end) end
     for i=1,16 do
-        local row=CreateFrame("Button",nil,window); row:SetSize(720,30); row:SetPoint("TOPLEFT",20,-270-(i-1)*30)
+        local row=CreateFrame("Button",nil,window); row:SetSize(720,30); row:SetPoint("TOPLEFT",20,-306-(i-1)*30)
         row.bg=fill(row,0.10,0.11,0.13); row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
         row.marker=art(row,"Interface\\Buttons\\WHITE8X8",0,0,2,30)
         row.icon=art(row,"Interface\\Icons\\INV_Misc_Map_01",7,-7,16,16)
@@ -304,7 +362,7 @@ local function build()
     nextButton:ClearAllPoints(); nextButton:SetPoint("BOTTOMLEFT",122,49)
     status=label(window,"",230,0,470); status:ClearAllPoints(); status:SetPoint("BOTTOMLEFT",230,57)
     footer=label(window,"",20,0,850); footer:ClearAllPoints(); footer:SetPoint("BOTTOMLEFT",20,23)
-    panel=CreateFrame("Frame",nil,window); panel:SetSize(340,630); panel:SetPoint("TOPRIGHT",-20,-154); fill(panel,0.035,0.09,0.11); border(panel)
+    panel=CreateFrame("Frame",nil,window); panel:SetSize(340,704); panel:SetPoint("TOPRIGHT",-20,-154); fill(panel,0.035,0.09,0.11); border(panel)
     heading=label(panel,"",14,-15,310,"GameFontNormalLarge")
     summary=label(panel,"",14,-48,310); summary:SetHeight(75); summary:SetJustifyV("TOP")
     panel.linkTitle=label(panel,"",14,-132,310,"GameFontNormal")
@@ -315,8 +373,12 @@ local function build()
     panel.welcomeArt=art(panel,"Interface\\Icons\\INV_Misc_Book_09",122,-185,96,96)
     panel.welcomeText=label(panel,"The healer who saved the run.\nThe tank who showed the way.\nThe friend who made it fun.\n\nKeep their story here.",30,-325,280,"GameFontHighlight")
     note=CreateFrame("EditBox",nil,panel,"InputBoxTemplate"); note:SetSize(302,26); note:SetPoint("TOPLEFT",20,-373); note:SetAutoFocus(false); note:SetMaxLetters(300); note:SetScript("OnEscapePressed",note.ClearFocus)
+    panel.nicknameLabel=label(panel,"Private nickname",14,-515,300,"GameFontNormal")
+    nickname=CreateFrame("EditBox",nil,panel,"InputBoxTemplate"); nickname:SetSize(302,26); nickname:SetPoint("TOPLEFT",20,-539); nickname:SetAutoFocus(false); nickname:SetMaxLetters(60); nickname:SetScript("OnEscapePressed",nickname.ClearFocus)
+    local function draftChanged() if selectedPerson then panel.noteLabel:SetText(dirty() and "Personal note - unsaved changes" or "A little note for next time") end end
+    note:SetScript("OnTextChanged",draftChanged); nickname:SetScript("OnTextChanged",draftChanged)
     actions[1]=button(panel,"Save note",14,-410,150,function()
-        if selectedPerson then selectedPerson.note=note:GetText(); note:ClearFocus(); PM.Refresh() end
+        saveDraft(); PM.Refresh()
     end)
     actions[1].bg:SetVertexColor(0.72,0.49,0.20,1); actions[1].textLabel:SetTextColor(0.06,0.10,0.12)
     favourite=button(panel,"Favourite",170,-410,156,function()
@@ -336,23 +398,58 @@ local function build()
             end
         end)
     end
-    forgetButton=button(panel,"Forget adventure",14,-603,312,askForget)
-    panel:SetHeight(646)
-    panel.timeline=label(panel,"",14,-510,310); panel.timeline:SetHeight(60); panel.timeline:SetJustifyV("TOP")
-    panel.previousLocations=button(panel,"Previous locations",14,-575,150,function() locationPage=math.max(1,locationPage-1); refreshDetails() end)
-    panel.nextLocations=button(panel,"More locations",170,-575,156,function() locationPage=locationPage+1; refreshDetails() end)
+    forgetButton=button(panel,"Forget adventure",14,-663,312,function() guard(askForget) end)
+    panel.timeline=label(panel,"",14,-577,310); panel.timeline:SetHeight(60); panel.timeline:SetJustifyV("TOP")
+    panel.previousLocations=button(panel,"Previous locations",14,-640,150,function() locationPage=math.max(1,locationPage-1); refreshDetails() end)
+    panel.nextLocations=button(panel,"More locations",170,-640,156,function() locationPage=locationPage+1; refreshDetails() end)
     local resize=button(window,"Resize",0,0,65,function() end); resize:ClearAllPoints(); resize:SetPoint("BOTTOMRIGHT",-10,10)
     resize:SetScript("OnMouseDown",function() window:StartSizing("BOTTOMRIGHT") end)
-    resize:SetScript("OnMouseUp",function() window:StopMovingOrSizing() end)
+    resize:SetScript("OnMouseUp",function() window:StopMovingOrSizing(); PM.SaveWindow() end)
     layout=function()
         local width=window:GetWidth()-400
         for _,row in ipairs(rows) do row:SetWidth(width) end
         PM.Refresh()
     end
     window:SetScript("OnSizeChanged",layout); window:SetScript("OnShow",layout); window:Hide()
-    window:SetScript("OnHide",function() if forgetDialog then forgetDialog:Hide() end; pendingForget=nil end)
+    window:SetScript("OnHide",function()
+        if dirty() and not allowHide then window:Show(); PM.Close(); return end
+        if forgetDialog then forgetDialog:Hide() end; pendingForget=nil
+    end)
 end
 function PM.Toggle()
     if not window then build() end
-    if window:IsShown() then window:Hide() else window:Show() end
+    if window:IsShown() then PM.Close() else window:Show() end
+end
+
+local minimapButton
+function PM.InitMinimap()
+    if not Minimap or not PM.db then return end
+    local settings=PM.db.minimap
+    if not minimapButton then
+        minimapButton=CreateFrame("Button","FamiliarFacesMinimapButton",Minimap)
+        minimapButton:SetSize(30,30); minimapButton:SetFrameStrata("MEDIUM"); minimapButton:EnableMouse(true)
+        fill(minimapButton,0.035,0.09,0.11); border(minimapButton)
+        art(minimapButton,"Interface\\Icons\\INV_Misc_Book_09",3,-3,24,24)
+        minimapButton:RegisterForDrag("LeftButton")
+        minimapButton:SetScript("OnClick",PM.Toggle)
+        local function position()
+            local radians=math.rad(PM.db.minimap.angle or 220)
+            minimapButton:ClearAllPoints()
+            minimapButton:SetPoint("CENTER",Minimap,"CENTER",math.cos(radians)*80,math.sin(radians)*80)
+        end
+        minimapButton.position=position
+        minimapButton:SetScript("OnDragStart",function(self)
+            self:SetScript("OnUpdate",function()
+                local x,y=GetCursorPosition(); local cx,cy=Minimap:GetCenter(); local scale=Minimap:GetEffectiveScale()
+                if cx and cy then PM.db.minimap.angle=math.deg(math.atan2(y/scale-cy,x/scale-cx)); position() end
+            end)
+        end)
+        minimapButton:SetScript("OnDragStop",function(self) self:SetScript("OnUpdate",nil) end)
+        minimapButton:SetScript("OnEnter",function(self)
+            if GameTooltip then GameTooltip:SetOwner(self,"ANCHOR_LEFT"); GameTooltip:SetText("Familiar Faces"); GameTooltip:AddLine("Click to open your journal. Drag to move.\nHide with /ff minimap.",1,1,1,true); GameTooltip:Show() end
+        end)
+        minimapButton:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
+    end
+    minimapButton.position()
+    if settings.hidden then minimapButton:Hide() else minimapButton:Show() end
 end

@@ -12,7 +12,7 @@ local id=0
 function CreateFrame(kind,name,parent,template)
  local f=original(kind,name,parent,template); id=id+1
  f.previewId=id; f.parent=parent; f.width=0; f.height=0
- f.SetPoint=function(self,p,x,y) if not self.anchor then self.anchor=p; self.x=x or 0; self.y=-(y or 0) end end
+ f.SetPoint=function(self,p,a,b,c,d) if not self.anchor then self.anchor=p; self.x=type(a)=='number' and a or c or 0; self.y=-(type(b)=='number' and b or d or 0) end end
  f.ClearAllPoints=function(self) self.anchor=nil end
  f.SetHeight=function(self,h) self.height=h end
  f.SetFrameStrata=function(self,s) self.strata=s end
@@ -55,7 +55,7 @@ def render(state):
   f=frames[key]
   if not f['visible']: return ''
   p=f['parent']; w=float(f['width'] or 0); h=float(f['height'] or 0)
-  pw=float(p['width'] or 0) if p and p['previewId'] else 1120; ph=float(p['height'] or 0) if p and p['previewId'] else 820
+  pw=float(p['width'] or 0) if p and p['previewId'] else 1120; ph=float(p['height'] or 0) if p and p['previewId'] else 880
   if f['kind']=='Texture' and 'WHITE8X8' in (f['texture'] or ''):
    if h==1 and not w: w=pw
    if w==1 and not h: h=ph
@@ -83,7 +83,7 @@ def render(state):
    css.extend(['border:1px solid #6b777e','background:#071820','padding:5px','color:#f4ebd8']); body=text(f['text'])
   if kind!='Texture': body+=''.join(element(k) for k in children.get(key,[]))
   return '<div class="region" style="'+';'.join(css)+'">'+body+'</div>'
- page='<!doctype html><meta charset="utf-8"><title>Familiar Faces layout preview</title><style>body{margin:0;background:#172935;font:12px Arial;color:#eee}.region{position:absolute;box-sizing:border-box}.window{position:relative;width:1120px;height:820px;margin:20px}img{display:block}</style><p style="margin:20px">Familiar Faces · Lua layout preview · Sample data · Native icons and input skins are placeholders</p><div class="window">'+''.join(element(k) for k in children.get(0,[]))+'</div>'
+ page='<!doctype html><meta charset="utf-8"><title>Familiar Faces layout preview</title><style>body{margin:0;background:#172935;font:12px Arial;color:#eee}.region{position:absolute;box-sizing:border-box}.window{position:relative;width:1120px;height:880px;margin:20px}img{display:block}</style><p style="margin:20px">Familiar Faces · Lua layout preview · Sample data · Native icons and input skins are placeholders</p><div class="window">'+''.join(element(k) for k in children.get(0,[]))+'</div>'
  (DEST/(state+'.html')).write_text(page,encoding='utf-8')
 DEST.mkdir(parents=True,exist_ok=True)
 Image.open(ROOT/'FamiliarFaces'/'Textures'/'Wordmark.tga').save(DEST/'Wordmark.png')

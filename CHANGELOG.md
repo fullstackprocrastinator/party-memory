@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0
+
+- Added saved journal size and position, restored when you reopen the addon or reload the UI.
+- Added Save, Discard and Cancel choices for unsaved notes and nicknames when switching companions, opening another adventure, forgetting an entry or closing the journal, including Escape.
+- Kept note drafts intact during incoming roster and location updates.
+- Added current-party markers and an In your party filter. Party membership updates even when recording is paused.
+- Added Last 7 days and Last 30 days history filters, with Clear filters restoring the full journal.
+- Added private companion nicknames, included in name and note searches. Save note saves both fields.
+- Added a draggable minimap journal button, a saved hide preference and `/ff minimap` to toggle it.
+- Added `/ff reset window` to restore the default journal placement and dimensions.
+- Preserved existing history, notes, favourites and settings.
+
+Validation: 19 deterministic Lua 5.1 tests pass, including draft protection, Escape/cancel, geometry restoration, nickname and time filters, and minimap dragging/toggling. In-game validation remains required. Feature images use labelled sample data.
+
 ## 0.4.0
 
 - Added optional reunion chat notices with a previous adventure and saved note, once per companion per party during the addon session.

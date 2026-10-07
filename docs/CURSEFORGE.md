@@ -34,3 +34,7 @@ Redesigned the journal with Adventures and Companions tabs, sortable tables, act
 ## Release notes for 0.4.0
 
 See [CHANGELOG.md](../CHANGELOG.md) for the release notes. Upload `FamiliarFaces-0.4.0-Forever.zip` for WoW Forever 1.60.1. The four feature images in `assets/curseforge/` are labelled sample-data previews, rather than in-game captures.
+
+## Release notes for 0.5.0
+
+Use the 0.5.0 section in [CHANGELOG.md](../CHANGELOG.md) and the updated [DESCRIPTION.md](DESCRIPTION.md). Upload `FamiliarFaces-0.5.0-Forever.zip` for WoW Forever 1.60.1. The updated Companions and unsaved-draft previews in `assets/curseforge/` demonstrate the new controls using labelled sample data.

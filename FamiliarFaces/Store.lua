@@ -58,13 +58,14 @@ end
 
 function PM.Init(db)
     db = db or {}
-    db.version = 3
+    db.version = 4
     db.sessions = db.sessions or {}
     db.people = db.people or {}
     db.nextID = db.nextID or 1
     db.enabled = db.enabled ~= false
     db.reunionNotices = db.reunionNotices ~= false
     db.favouritesFirst = db.favouritesFirst ~= false
+    db.minimap = db.minimap or {hidden=false,angle=220}
     PM.db = db
     return db
 end
@@ -146,7 +147,7 @@ function PM.Search(query, kind, favourites)
         local favourite = false
         for _, member in ipairs(session.members) do
             local person = PM.db.people[member.name] or {}
-            text = text .. " " .. member.name .. " " .. (person.note or "")
+            text = text .. " " .. member.name .. " " .. (person.note or "").." "..(person.nickname or "")
             favourite = favourite or person.favourite
         end
         if (not kind or session.kind == kind) and (not favourites or favourite)
@@ -165,33 +166,36 @@ function PM.Query(view, options)
     for _, session in ipairs(PM.db.sessions) do
         local locationText = session.zone .. " " .. session.owner .. " " .. session.kind
         for _, location in ipairs(session.locations or {}) do locationText = locationText .. " " .. location.zone end
+        local recent = not options.days or session.lastSeen >= time()-options.days*86400
         local matchingMember, matchesQuery = false, string.find(string.lower(locationText), query, 1, true) ~= nil
         for _, member in ipairs(session.members) do
             local person = PM.db.people[member.name] or {name = member.name, class = member.class}
             local eligible = (not options.class or (person.class or member.class) == options.class)
                 and (not options.favourites or person.favourite)
                 and (not options.notes or (person.note and person.note:match("%S")))
-            local personMatch = string.find(string.lower(member.name .. " " .. (person.note or "")), query, 1, true) ~= nil
+                and (not options.currentParty or (PM.currentParty and PM.currentParty[member.name]))
+            local personMatch = string.find(string.lower(member.name .. " " .. (person.note or "").." "..(person.nickname or "")), query, 1, true) ~= nil
             if eligible then
                 matchingMember = true
                 if personMatch then matchesQuery = true end
             end
             if view == "Companions" and eligible and (personMatch or string.find(string.lower(locationText), query, 1, true))
-                and (not options.kind or session.kind == options.kind) and not seen[member.name] then
+                and recent and (not options.kind or session.kind == options.kind) and not seen[member.name] then
                 seen[member.name] = true
                 results[#results + 1] = person
             end
         end
-        if view == "Adventures" and matchingMember and matchesQuery and (not options.kind or session.kind == options.kind) then
+        if view == "Adventures" and recent and matchingMember and matchesQuery and (not options.kind or session.kind == options.kind) then
             results[#results + 1] = session
         end
     end
-    if view == "Companions" and not options.kind then
+    if view == "Companions" and not options.kind and not options.days then
         for name,person in pairs(PM.db.people) do
             if not seen[name] and (not options.class or person.class==options.class)
                 and (not options.favourites or person.favourite)
                 and (not options.notes or (person.note and person.note:match("%S")))
-                and string.find(string.lower(name.." "..(person.note or "")),query,1,true) then
+                and (not options.currentParty or (PM.currentParty and PM.currentParty[name]))
+                and string.find(string.lower(name.." "..(person.note or "").." "..(person.nickname or "")),query,1,true) then
                 results[#results+1]=person
             end
         end

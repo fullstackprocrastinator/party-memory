@@ -37,7 +37,8 @@ function CreateFrame(kind,name,parent,template)
  local f = {scripts={},visible=true,text='',kind=kind,width=1120,height=760}
  local methods = {
   SetScript=function(self,event,fn) self.scripts[event]=fn end,
-  RegisterEvent=noop, SetSize=function(self,w,h) self.width=w; self.height=h end, SetPoint=noop,
+  RegisterEvent=noop, SetSize=function(self,w,h) self.width=w; self.height=h end,
+  SetPoint=function(self,p,a,b,c,d) self.point=p; self.pointX=type(a)=='number' and a or c; self.pointY=type(b)=='number' and b or d end,
   SetWidth=function(self,w) self.width=w end, GetWidth=function(self) return self.width end,
   GetHeight=function(self) return self.height end, ClearAllPoints=noop,
   SetResizable=noop, SetResizeBounds=noop, StartSizing=noop,
@@ -52,7 +53,7 @@ function CreateFrame(kind,name,parent,template)
   GetText=function(self) return self.text end,
   IsShown=function(self) return self.visible end,
   Show=function(self) self.visible=true; if self.scripts.OnShow then self.scripts.OnShow(self) end end,
-  Hide=function(self) self.visible=false end,
+  Hide=function(self) self.visible=false; if self.scripts.OnHide then self.scripts.OnHide(self) end end,
   CreateTexture=function() return CreateFrame('Texture') end,
   CreateFontString=function() return CreateFrame('FontString') end,
  }
@@ -291,6 +292,65 @@ class AddonTests(unittest.TestCase):
           assert(FamiliarFaces.db.people['Alice-OtherRealm'])
           clickText('Forget companion'); clickText('Confirm forget')
           assert(FamiliarFaces.db.people['Alice-OtherRealm']==nil and #FamiliarFaces.db.sessions==0)
+        ''')
+
+    def test_nicknames_recent_and_current_party_filters(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); FamiliarFaces.EndSession(clock)
+          FamiliarFaces.db.people['Alice-OtherRealm'].nickname='Westfall quest buddy'
+          clock=clock+10*86400; roster={{name='Bob',realm='Home Realm',class='WARRIOR'}}; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.Query('Companions',{query='westfall quest buddy'})==1)
+          assert(#FamiliarFaces.Query('Adventures',{query='westfall quest buddy'})==1)
+          assert(#FamiliarFaces.Query('Adventures',{days=7})==1)
+          assert(#FamiliarFaces.Query('Companions',{days=30})==2)
+          assert(#FamiliarFaces.Query('Companions',{currentParty=true})==1)
+          roster={}; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.Query('Companions',{currentParty=true})==0)
+        ''')
+
+    def test_draft_save_discard_and_roster_updates(self):
+        self.lua.execute('''
+          roster[2]={name='Bob',realm='Home Realm',class='WARRIOR'}; FamiliarFaces.Capture()
+          SlashCmdList.FAMILIARFACES(''); clickText('Companions')
+          local alice,bob
+          for _,b in ipairs(buttons) do if b.entry then if b.entry.name=='Alice-OtherRealm' then alice=b elseif b.entry.name=='Bob-HomeRealm' then bob=b end end end
+          alice.scripts.OnClick(alice)
+          local fields={}; for _,f in ipairs(frames) do if f.kind=='EditBox' then fields[#fields+1]=f end end
+          fields[2]:SetText('Draft note'); fields[3]:SetText('Quest buddy')
+          clock=clock+15; FamiliarFaces.Capture(); assert(fields[2]:GetText()=='Draft note' and fields[3]:GetText()=='Quest buddy')
+          bob.scripts.OnClick(bob); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note==nil)
+          clickText('Save'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Draft note')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].nickname=='Quest buddy')
+          fields[2]:SetText('Unsaved Bob'); clickText('Close'); clickText('Discard')
+          assert(not FamiliarFacesWindow:IsShown() and FamiliarFaces.db.people['Bob-HomeRealm'].note==nil)
+        ''')
+
+    def test_escape_close_cancel_and_saved_geometry(self):
+        self.lua.execute('''
+          UIParent.GetCenter=function() return 560,440 end
+          FamiliarFaces.db.window={width=1300,height=950,x=40,y=-25}
+          FamiliarFaces.Capture(); SlashCmdList.FAMILIARFACES(''); clickText('Companions')
+          assert(FamiliarFacesWindow:GetWidth()==1300 and FamiliarFacesWindow.pointX==40)
+          FamiliarFacesWindow.GetCenter=function() return 610,410 end
+          for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end
+          clickText('Helpful'); FamiliarFacesWindow:Hide(); assert(FamiliarFacesWindow:IsShown())
+          clickText('Cancel'); assert(FamiliarFacesWindow:IsShown())
+          clickText('Close'); clickText('Save'); assert(not FamiliarFacesWindow:IsShown())
+          assert(FamiliarFaces.db.window.width==1300 and FamiliarFaces.db.window.x==50 and FamiliarFaces.db.window.y==-30)
+          SlashCmdList.FAMILIARFACES('reset window'); assert(FamiliarFacesWindow:GetWidth()==1120)
+        ''')
+
+    def test_minimap_button_toggle_and_position(self):
+        self.lua.execute('''
+          Minimap=CreateFrame('Frame'); Minimap.GetCenter=function() return 100,100 end
+          Minimap.GetEffectiveScale=function() return 1 end
+          GetCursorPosition=function() return 180,100 end
+          FamiliarFaces.InitMinimap(); local b=FamiliarFacesMinimapButton
+          assert(b and b:IsShown()); b.scripts.OnClick(b); assert(FamiliarFacesWindow:IsShown())
+          b.scripts.OnDragStart(b); b.scripts.OnUpdate(b); b.scripts.OnDragStop(b)
+          assert(math.abs(FamiliarFaces.db.minimap.angle)<0.001 and b.scripts.OnUpdate==nil)
+          SlashCmdList.FAMILIARFACES('minimap'); assert(not b:IsShown())
+          SlashCmdList.FAMILIARFACES('minimap'); assert(b:IsShown())
         ''')
 
 if __name__ == '__main__':

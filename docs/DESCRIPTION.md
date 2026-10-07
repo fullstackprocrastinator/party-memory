@@ -15,10 +15,14 @@ Ever finish a great dungeon run and forget the name of the healer who saved it, 
 
 - Browse the **Companions** tab with class-coloured names, shared-adventure counts, last adventure and last-seen dates.
 - Search player names, realms, places, your characters and personal notes.
+- Save a private nickname such as Westfall quest buddy; nicknames are searchable too.
+- Identify current party members with a green party marker, or use the In your party filter to focus on them.
+- Narrow your journal to the last 7 or 30 days, then clear filters to return to everything.
 - Filter by activity, class, favourites or players with notes, and click column headings to sort.
 - Keep favourites at the top with the optional **Favourites first** setting.
 - View a companion's shared adventures and jump back into an entry.
 - Write personal notes, or use **Helpful**, **Patient** and **Great company** prompts. Prompts add to the note field; click **Save note** to keep your changes.
+- Save note saves both the note and nickname. Unsaved changes offer Save, Discard or Cancel when switching companions or closing the journal, including Escape. Incoming roster updates keep your draft intact.
 - Mark favourites, open a whisper or invite a selected companion using the game's normal social functions. Invites depend on the game's usual restrictions.
 
 ## A familiar face joins the party
@@ -36,7 +40,7 @@ Each companion gets at most one notice per party during the current addon sessio
 
 ## Made for your adventures
 
-A stylised gold title, teal panels, native game icons and a movable, resizable window make the journal feel at home in your travels. Click **Created by SqueezyLemons** to copy a link to more addons.
+A stylised gold title, teal panels, native game icons and a movable, resizable window make the journal feel at home in your travels. The journal remembers its size and position across reloads. An optional minimap button opens the journal; drag it around the minimap or hide it with the journal toggle. Click **Created by SqueezyLemons** to copy a link to more addons.
 
 ## Commands
 
@@ -46,6 +50,8 @@ A stylised gold title, teal panels, native game icons and a movable, resizable w
 | `/ff pause` | Pause recording. |
 | `/ff resume` | Resume recording. |
 | `/ff notices` | Toggle reunion chat notices. |
+| `/ff minimap` | Show or hide the minimap button. |
+| `/ff reset window` | Reset the journal's position and size. |
 | `/ff clear` | Show instructions for clearing saved data. |
 | `/ff clear confirm` | Erase all saved history, notes and favourites. |
 
