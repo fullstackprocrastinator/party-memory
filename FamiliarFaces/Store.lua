@@ -1,6 +1,57 @@
 FamiliarFaces = FamiliarFaces or {}
 local PM = FamiliarFaces
 
+PM.TagChoices={"Helpful guide","Quest buddy","Run again"}
+function PM.FirstAdventure(name)
+    local first
+    for _,session in ipairs(PM.db.sessions) do
+        for _,member in ipairs(session.members) do
+            if member.name==name and (not first or session.started<first.started) then first=session end
+        end
+    end
+    return first
+end
+function PM.RecentAdventure()
+    local latest
+    for _,session in ipairs(PM.db.sessions) do
+        if not latest or session.started>latest.started then latest=session end
+    end
+    return latest
+end
+function PM.HasTag(person,tag)
+    return not tag or (person.tags and person.tags[tag])
+end
+function PM.ToggleTag(person,tag)
+    person.tags=person.tags or {}; person.tags[tag]=not person.tags[tag] or nil
+end
+function PM.TagText(person)
+    local tags={}; for tag,enabled in pairs(person.tags or {}) do if enabled then tags[#tags+1]=tag end end
+    table.sort(tags); return table.concat(tags,", ")
+end
+function PM.Export()
+    local function encode(value)
+        if type(value)=="string" then return string.format("%q",value) end
+        if type(value)=="number" or type(value)=="boolean" then return tostring(value) end
+        if type(value)~="table" then return "nil" end
+        local keys={}; for key in pairs(value) do keys[#keys+1]=key end
+        table.sort(keys,function(a,b) if type(a)~=type(b) then return type(a)<type(b) end; return a<b end)
+        local entries={}
+        for _,key in ipairs(keys) do entries[#entries+1]="["..encode(key).."]="..encode(value[key]) end
+        return "{\n"..table.concat(entries,",\n").."\n}"
+    end
+    return "-- Familiar Faces journal backup v1. Contains private player names and notes.\nFamiliarFacesDB="..encode(PM.db).."\n"
+end
+function PM.ExportParts(text)
+    local parts,start={},1
+    while start<=#text do
+        local finish=math.min(#text,start+11999)
+        while text:byte(finish+1) and text:byte(finish+1)>=128 and text:byte(finish+1)<192 do finish=finish-1 end
+        parts[#parts+1]=text:sub(start,finish); start=finish+1
+    end
+    if #parts==0 then parts[1]="" end
+    return parts
+end
+
 function PM.LastAdventure(name, exclude)
     local latest
     for _,session in ipairs(PM.db.sessions) do
@@ -58,7 +109,7 @@ end
 
 function PM.Init(db)
     db = db or {}
-    db.version = 4
+    db.version = 5
     db.sessions = db.sessions or {}
     db.people = db.people or {}
     db.nextID = db.nextID or 1
@@ -142,12 +193,12 @@ function PM.Search(query, kind, favourites)
     local results = {}
     query = string.lower(query or "")
     for _, session in ipairs(PM.db.sessions) do
-        local text = session.owner .. " " .. session.zone .. " " .. session.kind
+        local text = session.owner .. " " .. session.zone .. " " .. session.kind.." "..(session.note or "")
         for _, location in ipairs(session.locations or {}) do text = text .. " " .. location.zone end
         local favourite = false
         for _, member in ipairs(session.members) do
             local person = PM.db.people[member.name] or {}
-            text = text .. " " .. member.name .. " " .. (person.note or "").." "..(person.nickname or "")
+            text = text .. " " .. member.name .. " " .. (person.note or "").." "..(person.nickname or "").." "..PM.TagText(person)
             favourite = favourite or person.favourite
         end
         if (not kind or session.kind == kind) and (not favourites or favourite)
@@ -162,11 +213,13 @@ end
 function PM.Query(view, options)
     options = options or {}
     local results, seen = {}, {}
+    local latestParty=options.recentParty and PM.RecentAdventure()
     local query = string.lower(options.query or "")
     for _, session in ipairs(PM.db.sessions) do
-        local locationText = session.zone .. " " .. session.owner .. " " .. session.kind
+        local locationText = session.zone .. " " .. session.owner .. " " .. session.kind.." "..(session.note or "")
         for _, location in ipairs(session.locations or {}) do locationText = locationText .. " " .. location.zone end
-        local recent = not options.days or session.lastSeen >= time()-options.days*86400
+        local recent = (not options.days or session.lastSeen >= time()-options.days*86400)
+            and (not options.recentParty or session==latestParty)
         local matchingMember, matchesQuery = false, string.find(string.lower(locationText), query, 1, true) ~= nil
         for _, member in ipairs(session.members) do
             local person = PM.db.people[member.name] or {name = member.name, class = member.class}
@@ -174,7 +227,8 @@ function PM.Query(view, options)
                 and (not options.favourites or person.favourite)
                 and (not options.notes or (person.note and person.note:match("%S")))
                 and (not options.currentParty or (PM.currentParty and PM.currentParty[member.name]))
-            local personMatch = string.find(string.lower(member.name .. " " .. (person.note or "").." "..(person.nickname or "")), query, 1, true) ~= nil
+                and PM.HasTag(person,options.tag)
+            local personMatch = string.find(string.lower(member.name .. " " .. (person.note or "").." "..(person.nickname or "").." "..PM.TagText(person)), query, 1, true) ~= nil
             if eligible then
                 matchingMember = true
                 if personMatch then matchesQuery = true end
@@ -185,17 +239,19 @@ function PM.Query(view, options)
                 results[#results + 1] = person
             end
         end
-        if view == "Adventures" and recent and matchingMember and matchesQuery and (not options.kind or session.kind == options.kind) then
+        if view == "Adventures" and recent and matchingMember and matchesQuery and (not options.kind or session.kind == options.kind)
+            and (not options.pinned or session.pinned) then
             results[#results + 1] = session
         end
     end
-    if view == "Companions" and not options.kind and not options.days then
+    if view == "Companions" and not options.kind and not options.days and not options.recentParty then
         for name,person in pairs(PM.db.people) do
             if not seen[name] and (not options.class or person.class==options.class)
                 and (not options.favourites or person.favourite)
                 and (not options.notes or (person.note and person.note:match("%S")))
                 and (not options.currentParty or (PM.currentParty and PM.currentParty[name]))
-                and string.find(string.lower(name.." "..(person.note or "").." "..(person.nickname or "")),query,1,true) then
+                and PM.HasTag(person,options.tag)
+                and string.find(string.lower(name.." "..(person.note or "").." "..(person.nickname or "").." "..PM.TagText(person)),query,1,true) then
                 results[#results+1]=person
             end
         end
@@ -218,6 +274,7 @@ function PM.Query(view, options)
         return item.started
     end
     table.sort(results, function(a, b)
+        if view=="Adventures" and not not a.pinned ~= not not b.pinned then return not not a.pinned end
         if view=="Companions" and options.favouritesFirst and not not a.favourite ~= not not b.favourite then return not not a.favourite end
         local av, bv = value(a), value(b)
         if av == bv then return tostring(a.id or a.name) < tostring(b.id or b.name) end

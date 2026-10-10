@@ -38,3 +38,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for the release notes. Upload `FamiliarFaces
 ## Release notes for 0.5.0
 
 Use the 0.5.0 section in [CHANGELOG.md](../CHANGELOG.md) and the updated [DESCRIPTION.md](DESCRIPTION.md). Upload `FamiliarFaces-0.5.0-Forever.zip` for WoW Forever 1.60.1. The updated Companions and unsaved-draft previews in `assets/curseforge/` demonstrate the new controls using labelled sample data.
+
+## Release notes for 0.6.0
+
+Use the 0.6.0 section in [CHANGELOG.md](../CHANGELOG.md) and the complete [DESCRIPTION.md](DESCRIPTION.md). Upload `FamiliarFaces-0.6.0-Forever.zip` for WoW Forever 1.60.1. The adventure, tag and backup demonstration images in `assets/curseforge/` use labelled sample data.

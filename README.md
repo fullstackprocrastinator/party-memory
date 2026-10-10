@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.5.0 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.6.0 · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -36,6 +36,9 @@ Join a party and the addon remembers who was there, when you played, and where y
 | **Make it yours** | Save private searchable nicknames, restore your window placement and open the journal from an optional minimap button. |
 | **Protect your notes** | Save, discard or cancel unsaved changes; roster updates preserve your draft. |
 | **Find recent company** | Filter the last 7 or 30 days and highlight current party members. |
+| **Remember the story** | Write adventure notes, pin memorable runs and view how you first met a companion. |
+| **Organise your company** | Tag helpful guides, quest buddies and people to run with again; open everyone from your latest party. |
+| **Keep a backup** | Copy the complete saved journal and settings to a private text archive. |
 
 ### Two ways to explore your journal
 
@@ -43,7 +46,7 @@ Join a party and the addon remembers who was there, when you played, and where y
 
 Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Toggle saved **Favourites first** and **Reunion notices** preferences at the top. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
 
-See the [complete addon description](docs/DESCRIPTION.md) and [0.5.0 changelog](CHANGELOG.md) for the new features and forgetting behaviour.
+See the [complete addon description](docs/DESCRIPTION.md) and [0.6.0 changelog](CHANGELOG.md) for the new features and forgetting behaviour.
 
 ## Getting started
 
@@ -51,7 +54,7 @@ See the [complete addon description](docs/DESCRIPTION.md) and [0.5.0 changelog](
 
 Install packages are available as artifacts from successful [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml). Open a completed run, download **FamiliarFaces-install-packages**, then extract the artifact archive to find the client ZIPs. GitHub may require you to sign in to download artifacts.
 
-For WoW Forever, choose **`FamiliarFaces-0.5.0-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
+For WoW Forever, choose **`FamiliarFaces-0.6.0-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
 
 ### Install
 
@@ -86,6 +89,7 @@ Select an adventure to browse its companions and location timeline, or open **Co
 | `/ff notices` | Toggle reunion chat notices. |
 | `/ff minimap` | Show or hide the minimap button. |
 | `/ff reset window` | Reset window size and position. |
+| `/ff export` | Open the journal text backup. |
 | `/ff clear` | Show instructions for clearing saved data. |
 | `/ff clear confirm` | Erase all saved history, notes and favourites. |
 

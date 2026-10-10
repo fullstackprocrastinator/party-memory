@@ -81,6 +81,7 @@ def render(state):
    css.extend(['z-index:3',f'font-size:{size}px',f'line-height:{size+3}px','overflow:hidden','white-space:nowrap','color:'+color(f['textColor'],'#f1c370' if 'Normal' in (f['font'] or '') else '#f4ebd8')]); body=text(f['text'])
   elif kind=='EditBox':
    css.extend(['border:1px solid #6b777e','background:#071820','padding:5px','color:#f4ebd8']); body=text(f['text'])
+  elif kind=='ScrollFrame': css.append('overflow:auto')
   if kind!='Texture': body+=''.join(element(k) for k in children.get(key,[]))
   return '<div class="region" style="'+';'.join(css)+'">'+body+'</div>'
  page='<!doctype html><meta charset="utf-8"><title>Familiar Faces layout preview</title><style>body{margin:0;background:#172935;font:12px Arial;color:#eee}.region{position:absolute;box-sizing:border-box}.window{position:relative;width:1120px;height:880px;margin:20px}img{display:block}</style><p style="margin:20px">Familiar Faces · Lua layout preview · Sample data · Native icons and input skins are placeholders</p><div class="window">'+''.join(element(k) for k in children.get(0,[]))+'</div>'

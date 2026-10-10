@@ -42,6 +42,7 @@ function CreateFrame(kind,name,parent,template)
   SetWidth=function(self,w) self.width=w end, GetWidth=function(self) return self.width end,
   GetHeight=function(self) return self.height end, ClearAllPoints=noop,
   SetResizable=noop, SetResizeBounds=noop, StartSizing=noop,
+  SetMultiLine=noop, SetScrollChild=noop, SetScale=function(self,s) self.scale=s end, GetScale=function(self) return self.scale or 1 end,
   SetHeight=noop, SetJustifyH=noop, SetJustifyV=noop, SetFontObject=noop,
   SetFrameStrata=noop, SetMovable=noop, EnableMouse=noop, RegisterForDrag=noop,
   StartMoving=noop, StopMovingOrSizing=noop, SetClampedToScreen=noop,
@@ -351,6 +352,62 @@ class AddonTests(unittest.TestCase):
           assert(math.abs(FamiliarFaces.db.minimap.angle)<0.001 and b.scripts.OnUpdate==nil)
           SlashCmdList.FAMILIARFACES('minimap'); assert(not b:IsShown())
           SlashCmdList.FAMILIARFACES('minimap'); assert(b:IsShown())
+        ''')
+
+    def test_adventure_notes_pins_and_draft_guard(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); SlashCmdList.FAMILIARFACES('')
+          for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end
+          local field; local seen=0
+          for _,f in ipairs(frames) do if f.kind=='EditBox' then seen=seen+1; if seen==2 then field=f end end end
+          field:SetText('First dungeon clear'); clickText('Pin adventure'); FamiliarFaces.Capture()
+          assert(field:GetText()=='First dungeon clear')
+          clickText('Close'); clickText('Save')
+          assert(FamiliarFaces.db.sessions[1].note=='First dungeon clear' and FamiliarFaces.db.sessions[1].pinned)
+          assert(#FamiliarFaces.Query('Adventures',{query='first dungeon clear',pinned=true})==1)
+          assert(#FamiliarFaces.Search('first dungeon clear')==1)
+        ''')
+
+    def test_tags_recent_shortcut_and_first_meeting(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); local first=FamiliarFaces.active; first.pinned=true; FamiliarFaces.EndSession(clock)
+          clock=2000; roster[2]={name='Bob',realm='Home Realm',class='WARRIOR'}; zone='Deadmines'; FamiliarFaces.Capture()
+          local alice=FamiliarFaces.db.people['Alice-OtherRealm']; FamiliarFaces.ToggleTag(alice,'Helpful guide')
+          assert(FamiliarFaces.FirstAdventure(alice.name)==first and FamiliarFaces.LastAdventure(alice.name).zone=='Deadmines')
+          assert(#FamiliarFaces.Query('Companions',{tag='Helpful guide'})==1)
+          assert(#FamiliarFaces.Query('Companions',{query='helpful guide'})==1)
+          assert(FamiliarFaces.Query('Adventures',{})[1]==first)
+          SlashCmdList.FAMILIARFACES(''); clickText('Recent companions')
+          assert(#FamiliarFaces.Query('Companions',{recentParty=true})==2)
+          for _,b in ipairs(buttons) do if b.entry and b.entry.name==alice.name then b.scripts.OnClick(b); break end end
+          clickText('Private tags'); clickText('Helpful guide [on]'); assert(not FamiliarFaces.HasTag(alice,'Helpful guide'))
+        ''')
+
+    def test_backup_round_trip_and_multipart_copy(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); local original=FamiliarFaces.db
+          local p=original.people['Alice-OtherRealm']; p.note='quotes " and newline\\n and backslash \\\\'; p.nickname='Quest buddy'; p.tags={['Run again']=true}
+          original.sessions[1].note='A memorable run'; original.sessions[1].pinned=true
+          local backup=FamiliarFaces.Export(); assert(loadstring(backup))(); local copy=FamiliarFacesDB
+          assert(copy.people[p.name].note==p.note and copy.people[p.name].tags['Run again'] and copy.sessions[1].pinned)
+          p.note=string.rep('x',15000); SlashCmdList.FAMILIARFACES('export')
+          local field; for _,f in ipairs(frames) do if f.kind=='EditBox' and f.text:find('-- Familiar Faces journal backup',1,true) then field=f end end
+          assert(field and #field.text==12000); local first=field.text; clickText('Next part')
+          assert(first..field.text==FamiliarFaces.Export())
+          local unicode=string.rep('é',8000); local parts=FamiliarFaces.ExportParts(unicode)
+          assert(table.concat(parts)==unicode and #parts==2)
+        ''')
+
+    def test_small_screen_scale_and_keyboard_editing(self):
+        self.lua.execute('''
+          UIParent.GetWidth=function() return 900 end; UIParent.GetHeight=function() return 700 end
+          FamiliarFaces.Capture(); SlashCmdList.FAMILIARFACES('')
+          assert(FamiliarFacesWindow:GetWidth()*FamiliarFacesWindow:GetScale()<=860)
+          assert(FamiliarFacesWindow:GetHeight()*FamiliarFacesWindow:GetScale()<=660)
+          local fields={}; for _,f in ipairs(frames) do if f.kind=='EditBox' then fields[#fields+1]=f end end
+          fields[1].scripts.OnEnterPressed(fields[1]); fields[2]:SetText('Adventure keyboard note')
+          fields[2].scripts.OnEnterPressed(fields[2]); assert(FamiliarFaces.db.sessions[1].note=='Adventure keyboard note')
+          fields[2].scripts.OnTabPressed(fields[2]); fields[1].scripts.OnTabPressed(fields[1])
         ''')
 
 if __name__ == '__main__':

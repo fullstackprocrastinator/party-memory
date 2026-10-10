@@ -13,7 +13,7 @@ const { pathToFileURL } = require('url');
   const browser = await chromium.launch({ headless: true, executablePath });
   try {
     const page = await browser.newPage({ viewport: { width: 1160, height: 900 }, deviceScaleFactor: 1 });
-    for (const state of ['adventures', 'companions', 'forgetting', 'reunion', 'drafts', 'party']) {
+    for (const state of ['adventures', 'companions', 'forgetting', 'reunion', 'drafts', 'party', 'tags', 'backup']) {
       const source = path.resolve(__dirname, '../assets/curseforge/familiar-faces-' + state + '.html');
       await page.goto(pathToFileURL(source).href);
       await page.evaluate(() => Promise.all([...document.images].map(img => img.decode())));

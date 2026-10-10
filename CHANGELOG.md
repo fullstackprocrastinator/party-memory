@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0
+
+- Added Recent companions, a shortcut to everyone recorded in your most recent party, independent of pinned sorting.
+- Added private Helpful guide, Quest buddy and Run again tags, with tag filtering and search.
+- Added adventure notes alongside individual companion notes. Adventure drafts use the existing Save, Discard and Cancel protection.
+- Added pinned adventures, sorted above other entries, and a Pins filter.
+- Added how-we-met profiles showing first saved adventure, latest adventure and total recorded parties.
+- Added a complete journal-and-settings text export through Export backup or `/ff export`. Large backups use ordered copyable parts with safe Unicode boundaries.
+- Added automatic journal scaling to fit smaller screens, single-line labels and full hover details for long names.
+- Added keyboard navigation: Tab moves between search and detail fields; Enter opens the first search result or saves detail edits. Escape cancels the unsaved-change prompt.
+- Preserved existing saved history, notes, nicknames, favourites and settings.
+
+Validation: 23 deterministic Lua 5.1 tests pass, including adventure draft protection, tag filtering, recent-party selection, first/latest meetings, backup round trips, multipart copying, small-screen fitting and keyboard editing. In-game validation remains required.
+
 ## 0.5.0
 
 - Added saved journal size and position, restored when you reopen the addon or reload the UI.

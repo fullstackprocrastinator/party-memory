@@ -6,11 +6,12 @@ ROOT = Path(__file__).resolve().parents[1]
 generator = ROOT / 'scripts/preview-familiarfaces-ui.py'
 code = generator.read_text(encoding='utf-8')
 code = code.replace("local original=CreateFrame", "previewMessages={}; DEFAULT_CHAT_FRAME.AddMessage=function(_,message) previewMessages[#previewMessages+1]=message end\nlocal original=CreateFrame")
-code = code.replace("if state=='companions':", "if state in ('companions','forgetting','drafts','party'):")
+code = code.replace("if state=='companions':", "if state in ('companions','forgetting','drafts','party','tags'):")
 code = code.replace(" frames={", " if state=='forgetting': lua.execute(\"clickText('Forget companion')\")\n if state=='drafts': lua.execute(\"clickText('Helpful'); clickText('Close')\")\n if state=='reunion': lua.execute(\"previewMessages={}; clock=clock+3600; FamiliarFaces.Capture(); for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end\")\n frames={")
 code = code.replace(" (DEST/(state+'.html')).write_text", " if state=='reunion': page+='<aside style=\"padding:18px 30px;background:#071820;color:#f5deb0\"><b>Example reunion chat messages</b><br>'+ '<br>'.join(text(m) for m in lua.globals().previewMessages.values())+'</aside>'\n (DEST/(state+'.html')).write_text")
 code = code.replace(" frames={", " if state=='party': lua.execute(\"clickText('In your party: off'); clickText('When: Any time')\")\n frames={")
-code = code.replace("('empty','adventures','companions')", "('empty','adventures','companions','forgetting','reunion','drafts','party')")
+code = code.replace(" frames={", " if state=='tags': lua.execute(\"clickText('Private tags')\")\n if state=='backup': lua.execute(\"clickText('Export backup')\")\n frames={")
+code = code.replace("('empty','adventures','companions')", "('empty','adventures','companions','forgetting','reunion','drafts','party','tags','backup')")
 extra = '''
    RAID_CLASS_COLORS.MAGE={r=0.25,g=0.78,b=0.92}
    RAID_CLASS_COLORS.ROGUE={r=1,g=0.96,b=0.41}
@@ -32,6 +33,9 @@ code = code.replace("   roster={{name='Alice',realm='HomeRealm',class='PRIEST',r
 code = code.replace("   FamiliarFaces.db.people['Alice-HomeRealm'].favourite=true", """   FamiliarFaces.db.people['Alice-HomeRealm'].favourite=true
    FamiliarFaces.db.people['Bram-HomeRealm'].note='Explained every boss. Would group again.'
    FamiliarFaces.db.people['Alice-HomeRealm'].nickname='Westfall quest buddy'
+   FamiliarFaces.db.people['Alice-HomeRealm'].tags={['Helpful guide']=true,['Run again']=true}
+   FamiliarFaces.db.sessions[1].note='Our first Deadmines clear. Patient group, lots of laughs.'
+   FamiliarFaces.db.sessions[1].pinned=true
    FamiliarFaces.db.people['Bram-HomeRealm'].favourite=true
    FamiliarFaces.db.people['Mira-HomeRealm'].note='Always brings snacks.'""")
 exec(compile(code, str(generator), 'exec'), {'__file__': str(generator), '__name__': '__main__'})
@@ -45,6 +49,8 @@ cards = {
  'reunion': ('A familiar face joins the party.', 'Optional reunion messages recall your previous adventure and note, once per companion per party.'),
  'drafts': ('A good memory should not get lost.', 'Save, discard or cancel when leaving an unsaved note or nickname. Roster updates keep your draft intact.'),
  'party': ('Your current company, at a glance.', 'Focus on the people in your party, filter recent adventures and keep a searchable private nickname.'),
+ 'tags': ('Remember what made them memorable.', 'Keep private companion tags, filter by them and revisit how you first met.'),
+ 'backup': ('Keep a copy of your adventures.', 'Copy your complete saved journal and settings into a private text backup.'),
 }
 for state, (title, caption) in cards.items():
  page = (ROOT / f'docs/previews/familiar-faces/{state}.html').read_text(encoding='utf-8')

@@ -82,6 +82,8 @@ SlashCmdList.FAMILIARFACES = function(input)
         PM.db.minimap.hidden=not PM.db.minimap.hidden
         if PM.InitMinimap then PM.InitMinimap() end
         if PM.Refresh then PM.Refresh() end
+    elseif input == "export" then
+        if PM.ShowExport then PM.ShowExport() end
     elseif input == "reset window" then
         PM.db.window=nil; if PM.ResetWindow then PM.ResetWindow() end
     elseif input == "notices" then
