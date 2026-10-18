@@ -1,5 +1,7 @@
 # CurseForge release checklist
 
+Current maintenance package: **FamiliarFaces-0.6.1-Forever.zip**. Use the 0.6.1 notes in [CHANGELOG.md](../CHANGELOG.md). Target remains WoW Forever 1.60.1, interface 16001; build 70450 was identified from local installation metadata. See [the patch review](PATCH-REVIEW.md) for validation limits.
+
 1. Confirm the intended game client. Test the addon in that client using TESTING.md, and set its exact interface number in the TOC. Keep private-server-only packages separately labelled; do not claim support for official clients you have not tested.
 2. Run `pwsh -File scripts/package.ps1 -Client Retail` for Retail, or `-Client 335` for legacy 3.3.5. The default command produces a WoW Forever package (interface 16001); do not label it as an official Retail release. Inspect the generated ZIP: its root must contain the FamiliarFaces folder, with the TOC and Lua files inside.
 3. Create a World of Warcraft project at https://authors.curseforge.com/ with the name **Familiar Faces**. Suggested category: Chat & Communication or Miscellaneous (use the current available categories). Select MIT as the license and use the GitHub repository for source and issues.

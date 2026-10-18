@@ -73,6 +73,8 @@ Large backups are split into numbered parts. Copy every part into one text file 
 
 This package targets **WoW Forever 1.60.1**, interface **16001**. History begins when the addon is installed; earlier parties cannot be recovered. Outdoor parties are labelled Questing. Raid, battleground and arena groups are excluded.
 
+Version 0.6.1 adds safer same-realm player recording and protects active adventures during loading-screen world transfers. Reviewed against the October 15 beta notes and installed client version metadata 1.60.1.70450; in-game verification of this build is still pending.
+
 Your journal is saved locally in your WoW account. Familiar Faces does not collect chat messages, send telemetry or automatically share your notes, nicknames or tags with other players. No other addons are required. Existing Familiar Faces history, notes and favourites are preserved when updating. Recorded parties and durations do not verify dungeon completion, and first/latest summaries reflect the history you have kept.
 
 Created by **SqueezyLemons** · [More addons](https://www.curseforge.com/members/squeezylemons/projects) · [Source and issues](https://github.com/fullstackprocrastinator/party-memory)

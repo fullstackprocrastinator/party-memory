@@ -6,19 +6,24 @@ function PM.NotifyReunion(name, previous, person)
         ..(note and note:match("%S") and (" Note: "..note) or ""))
 end
 local function safe(value)
-    return value ~= nil and (not issecretvalue or not issecretvalue(value))
+    return (not issecretvalue or not issecretvalue(value)) and value ~= nil
 end
 local function nameFor(unit)
     local name, realm = UnitName(unit)
-    if not safe(name) or not safe(realm) then return end
-    if not name or name == UNKNOWNOBJECT or name == "Unknown" then return end
+    -- UnitName may omit the realm for same-realm players.
+    if not safe(name) or (issecretvalue and issecretvalue(realm)) then return end
+    if name == "" or name == UNKNOWNOBJECT or name == "Unknown" then return end
     realm = realm and realm ~= "" and realm or GetRealmName()
-    return name .. "-" .. (realm or "UnknownRealm"):gsub("%s", "")
+    if not safe(realm) or realm=="" then return end
+    return name .. "-" .. realm:gsub("%s", "")
 end
 function PM.Capture()
     if not PM.db then return end
+    -- World-instance transfers briefly expose an empty or incomplete roster.
+    if PM.loadingWorld then return end
     local raid = IsInRaid and IsInRaid() or (GetNumRaidMembers and GetNumRaidMembers() > 0)
     local count = GetNumSubgroupMembers and GetNumSubgroupMembers() or (GetNumPartyMembers and GetNumPartyMembers() or 0)
+    if not raid and count==0 and PM.active and PM.rosterGraceUntil and time()<PM.rosterGraceUntil then return end
     if raid or count == 0 then PM.currentParty={}; PM.EndSession(time()); if PM.Refresh then PM.Refresh() end; return end
     -- Check for leaving a party even in combat; defer restricted unit reads.
     if InCombatLockdown and InCombatLockdown() then return end
@@ -44,13 +49,19 @@ function PM.Capture()
     if PM.Refresh then PM.Refresh() end
 end
 frame:RegisterEvent("ADDON_LOADED")
-for _, event in ipairs({"PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE", "PARTY_MEMBERS_CHANGED",
+for _, event in ipairs({"PLAYER_ENTERING_WORLD", "PLAYER_LEAVING_WORLD", "GROUP_ROSTER_UPDATE", "PARTY_MEMBERS_CHANGED",
     "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_LOGOUT"}) do
     pcall(frame.RegisterEvent, frame, event)
 end
 frame:SetScript("OnEvent", function(_, event, name)
     if event == "ADDON_LOADED" then
         if name == "FamiliarFaces" then FamiliarFacesDB = PM.Init(FamiliarFacesDB); if PM.InitMinimap then PM.InitMinimap() end end
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        PM.loadingWorld=true
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        PM.loadingWorld=false; PM.rosterGraceUntil=time()+5; PM.Capture()
+    elseif event == "PLAYER_LOGOUT" then
+        PM.loadingWorld=false; PM.rosterGraceUntil=nil; PM.Capture()
     else PM.Capture() end
 end)
 local elapsed = 0

@@ -410,6 +410,46 @@ class AddonTests(unittest.TestCase):
           fields[2].scripts.OnTabPressed(fields[2]); fields[1].scripts.OnTabPressed(fields[1])
         ''')
 
+    def test_same_realm_nil_realm_names(self):
+        self.lua.execute('''
+          roster={{name='Alice',class='PRIEST'}}
+          local original=UnitName
+          UnitName=function(unit) if unit=='player' then return 'Me',nil end; return original(unit) end
+          FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==1)
+          assert(FamiliarFaces.db.sessions[1].owner=='Me-HomeRealm')
+          assert(FamiliarFaces.db.people['Alice-HomeRealm'])
+        ''')
+
+    def test_restricted_realm_waits_for_safe_roster(self):
+        self.lua.execute('''
+          local restricted={}; issecretvalue=function(value) return rawequal(value,restricted) end
+          local original=UnitName
+          UnitName=function(unit) if unit=='party1' then return 'Alice',restricted end; return original(unit) end
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          UnitName=function(unit) if unit=='party1' then return '',nil end; return original(unit) end
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          UnitName=function(unit) if unit=='party1' then return 'Alice',nil end; return original(unit) end
+          local realmName=GetRealmName; GetRealmName=function() return nil end
+          FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)
+          GetRealmName=realmName
+          FamiliarFaces.Capture(); assert(FamiliarFaces.db.people['Alice-HomeRealm'])
+        ''')
+
+    def test_world_transfer_empty_roster_preserves_session(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); local session=FamiliarFaces.active
+          frames[1].scripts.OnEvent(frames[1],'PLAYER_LEAVING_WORLD')
+          roster={}; FamiliarFaces.Capture(); assert(FamiliarFaces.active==session)
+          frames[1].scripts.OnEvent(frames[1],'PLAYER_ENTERING_WORLD')
+          assert(FamiliarFaces.active==session)
+          clock=clock+2; roster={{name='Alice',realm='Other Realm',class='PRIEST'}}
+          zone='Deadmines'; instanceType='party'; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==1 and FamiliarFaces.active==session and session.zone=='Deadmines')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==1)
+          roster={}; clock=clock+6; FamiliarFaces.Capture(); assert(FamiliarFaces.active==nil)
+        ''')
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.1
+
+- Reviewed against Blizzard's October 15 beta development notes and installed WoW Forever version metadata 1.60.1.70450.
+- Fixed recording same-realm players when UnitName returns no realm, including the current character.
+- Deferred restricted and incomplete player names safely until usable roster information is available.
+- Preserved an active adventure during loading-screen world transfers. Briefly empty rosters receive a five-second grace period after entering the world.
+- Kept the Forever package interface at 16001 and preserved existing saved history and settings.
+
+Validation: all 26 Lua 5.1 tests pass. This is an automated compatibility review, not an in-game verification on build 70450.
+
 ## 0.6.0
 
 - Added Recent companions, a shortcut to everyone recorded in your most recent party, independent of pinned sorting.

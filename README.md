@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.6.0 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.6.1 · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -46,7 +46,7 @@ Join a party and the addon remembers who was there, when you played, and where y
 
 Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Toggle saved **Favourites first** and **Reunion notices** preferences at the top. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
 
-See the [complete addon description](docs/DESCRIPTION.md) and [0.6.0 changelog](CHANGELOG.md) for the new features and forgetting behaviour.
+See the [complete addon description](docs/DESCRIPTION.md) and [0.6.1 changelog](CHANGELOG.md) for the new features and forgetting behaviour.
 
 ## Getting started
 
@@ -54,7 +54,7 @@ See the [complete addon description](docs/DESCRIPTION.md) and [0.6.0 changelog](
 
 Install packages are available as artifacts from successful [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml). Open a completed run, download **FamiliarFaces-install-packages**, then extract the artifact archive to find the client ZIPs. GitHub may require you to sign in to download artifacts.
 
-For WoW Forever, choose **`FamiliarFaces-0.6.0-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
+For WoW Forever, choose **`FamiliarFaces-0.6.1-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
 
 ### Install
 
