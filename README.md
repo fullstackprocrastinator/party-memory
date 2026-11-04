@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.6.1 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.6.2 · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -46,22 +46,22 @@ Join a party and the addon remembers who was there, when you played, and where y
 
 Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Toggle saved **Favourites first** and **Reunion notices** preferences at the top. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
 
-See the [complete addon description](docs/DESCRIPTION.md) and [0.6.1 changelog](CHANGELOG.md) for the new features and forgetting behaviour.
+See the [complete addon description](docs/DESCRIPTION.md) and [changelog](CHANGELOG.md).
 
 ## Getting started
 
 ### Download
 
-Install packages are available as artifacts from successful [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml). Open a completed run, download **FamiliarFaces-install-packages**, then extract the artifact archive to find the client ZIPs. GitHub may require you to sign in to download artifacts.
-
-For WoW Forever, choose **`FamiliarFaces-0.6.1-Forever.zip`**. GitHub's **Code → Download ZIP** contains the source repository, rather than a ready-to-install addon.
+[Download Familiar Faces 0.6.2 for WoW Forever](downloads/FamiliarFaces-0.6.2-Forever.zip?raw=true). This is the install ZIP. Other client packages are available from [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml).
 
 ### Install
 
 1. Close WoW.
-2. Extract the client ZIP and place its **`FamiliarFaces`** folder into your game's **`Interface/AddOns`** directory.
+2. Extract the ZIP and put the **`FamiliarFaces`** folder in **`_forever_/Interface/AddOns`** under your World of Warcraft installation.
 3. Restart the game and enable **Familiar Faces** in the character-selection AddOns menu.
 4. Log in, type **`/ff`**, and join a party. Recording starts automatically; allow up to 15 seconds for the next periodic capture.
+
+**Moving from the beta?** The live install has its own saved settings. To bring your beta journal over, close both clients, back up any live `FamiliarFaces.lua` in `_forever_/WTF/Account/<account>/SavedVariables/`, and copy the beta's `FamiliarFaces.lua` from the corresponding `_classic_beta_` directory into that live SavedVariables folder. This replaces the live journal rather than merging it. Skip this step to start fresh.
 
 ```text
 Interface/

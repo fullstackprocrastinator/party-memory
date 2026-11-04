@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2 — Forever launch
+
+- Packaged Familiar Faces for the live WoW Forever client, version 1.60.1 (interface 16001).
+- Added a direct install ZIP and instructions for bringing a beta journal into the live client.
+- Preserved party tracking, saved history, notes, and settings. No saved-data migration is needed when upgrading within the same installation.
+
+Launch client metadata checked against build 70755. Live realm gameplay has not yet been verified.
+
 ## 0.6.1
 
 - Reviewed against Blizzard's October 15 beta development notes and installed WoW Forever version metadata 1.60.1.70450.

@@ -1,5 +1,7 @@
 # CurseForge release checklist
 
+Launch upload: **FamiliarFaces-0.6.2-Forever.zip**, game version **1.60.1** under **WoW Forever**, release type **Release**. Use the 0.6.2 section of [CHANGELOG.md](../CHANGELOG.md).
+
 Current maintenance package: **FamiliarFaces-0.6.1-Forever.zip**. Use the 0.6.1 notes in [CHANGELOG.md](../CHANGELOG.md). Target remains WoW Forever 1.60.1, interface 16001; build 70450 was identified from local installation metadata. See [the patch review](PATCH-REVIEW.md) for validation limits.
 
 1. Confirm the intended game client. Test the addon in that client using TESTING.md, and set its exact interface number in the TOC. Keep private-server-only packages separately labelled; do not claim support for official clients you have not tested.
