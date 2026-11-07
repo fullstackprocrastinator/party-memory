@@ -17,14 +17,18 @@ local function nameFor(unit)
     if not safe(realm) or realm=="" then return end
     return name .. "-" .. realm:gsub("%s", "")
 end
+PM.NameFor=nameFor
 function PM.Capture()
     if not PM.db then return end
     -- World-instance transfers briefly expose an empty or incomplete roster.
     if PM.loadingWorld then return end
     local raid = IsInRaid and IsInRaid() or (GetNumRaidMembers and GetNumRaidMembers() > 0)
     local count = GetNumSubgroupMembers and GetNumSubgroupMembers() or (GetNumPartyMembers and GetNumPartyMembers() or 0)
-    if not raid and count==0 and PM.active and PM.rosterGraceUntil and time()<PM.rosterGraceUntil then return end
-    if raid or count == 0 then PM.currentParty={}; PM.EndSession(time()); if PM.Refresh then PM.Refresh() end; return end
+    if not raid and count==0 and (PM.active or PM.pendingResume) and PM.rosterGraceUntil and time()<PM.rosterGraceUntil then return end
+    if raid or count == 0 then
+        PM.currentParty={}; PM.EndSession(time(),false,not raid)
+        if PM.Refresh then PM.Refresh() end; return
+    end
     -- Check for leaving a party even in combat; defer restricted unit reads.
     if InCombatLockdown and InCombatLockdown() then return end
     local members = {}
@@ -43,31 +47,38 @@ function PM.Capture()
     if instanceType == "pvp" or instanceType == "arena" or instanceType == "raid" then PM.currentParty={}; PM.EndSession(time()); if PM.Refresh then PM.Refresh() end; return end
     local owner = nameFor("player")
     if not owner then return end
+    PM.currentOwner=owner
     PM.currentParty=current
     PM.Record(owner, members, { kind = instanceType == "party" and "Dungeon" or "Questing",
         zone = zone ~= "" and zone or GetZoneText() or "Unknown", difficulty = difficulty }, time())
+    PM.Checkpoint(owner,members,time())
     if PM.Refresh then PM.Refresh() end
 end
 frame:RegisterEvent("ADDON_LOADED")
 for _, event in ipairs({"PLAYER_ENTERING_WORLD", "PLAYER_LEAVING_WORLD", "GROUP_ROSTER_UPDATE", "PARTY_MEMBERS_CHANGED",
-    "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_LOGOUT"}) do
+    "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "PLAYER_LOGOUT"}) do
     pcall(frame.RegisterEvent, frame, event)
 end
 frame:SetScript("OnEvent", function(_, event, name)
     if event == "ADDON_LOADED" then
-        if name == "FamiliarFaces" then FamiliarFacesDB = PM.Init(FamiliarFacesDB); if PM.InitMinimap then PM.InitMinimap() end end
+        if name == "FamiliarFaces" then
+            FamiliarFacesDB = PM.Init(FamiliarFacesDB)
+            if PM.InitMinimap then PM.InitMinimap() end
+            if PM.InitTooltips then PM.InitTooltips() end
+        end
     elseif event == "PLAYER_LEAVING_WORLD" then
         PM.loadingWorld=true
     elseif event == "PLAYER_ENTERING_WORLD" then
-        PM.loadingWorld=false; PM.rosterGraceUntil=time()+5; PM.Capture()
+        PM.loadingWorld=false; PM.rosterGraceUntil=time()+5; PM.currentOwner=nameFor("player"); PM.Capture()
     elseif event == "PLAYER_LOGOUT" then
         PM.loadingWorld=false; PM.rosterGraceUntil=nil; PM.Capture()
     else PM.Capture() end
+    if PM.MaybeShowRecap then PM.MaybeShowRecap() end
 end)
 local elapsed = 0
 frame:SetScript("OnUpdate", function(_, delta)
     elapsed = elapsed + delta
-    if elapsed >= 15 then elapsed = 0; PM.Capture() end
+    if elapsed >= 15 then elapsed = 0; PM.Capture(); if PM.MaybeShowRecap then PM.MaybeShowRecap() end end
 end)
 SLASH_FAMILIARFACES1 = "/pm"
 SLASH_FAMILIARFACES2 = "/partymemory"
@@ -83,8 +94,11 @@ SlashCmdList.FAMILIARFACES = function(input)
         PM.Capture()
     elseif input == "clear confirm" then
         local enabled,notices,first,minimap,placement=PM.db.enabled,PM.db.reunionNotices,PM.db.favouritesFirst,PM.db.minimap,PM.db.window
+        local tooltips,tooltipNotes,recaps=PM.db.tooltips,PM.db.tooltipNotes,PM.db.recaps
         PM.EndSession(time())
-        FamiliarFacesDB = PM.Init({enabled = enabled,reunionNotices=notices,favouritesFirst=first,minimap=minimap,window=placement})
+        PM.pendingRecap=nil; if PM.HideRecap then PM.HideRecap() end
+        FamiliarFacesDB = PM.Init({enabled = enabled,reunionNotices=notices,favouritesFirst=first,minimap=minimap,window=placement,
+            tooltips=tooltips,tooltipNotes=tooltipNotes,recaps=recaps})
         if PM.Refresh then PM.Refresh() end
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: history, notes and favourites cleared.")
     elseif input == "clear" then
@@ -95,6 +109,8 @@ SlashCmdList.FAMILIARFACES = function(input)
         if PM.Refresh then PM.Refresh() end
     elseif input == "export" then
         if PM.ShowExport then PM.ShowExport() end
+    elseif input == "settings" then
+        if PM.ShowSettings then PM.ShowSettings() end
     elseif input == "reset window" then
         PM.db.window=nil; if PM.ResetWindow then PM.ResetWindow() end
     elseif input == "notices" then

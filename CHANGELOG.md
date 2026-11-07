@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — Good Company
+
+- Added optional player hover reminders with recorded adventures together, the last meeting and favourite status. Private notes can be included separately in Settings and are off by default. Hover reminders defer restricted reads during combat.
+- Added optional end-of-adventure recaps with quick favourite buttons and shortcuts to companion or adventure notes. Recaps wait until combat and loading screens end, support larger historical rosters, and can be dismissed. Enable them in Settings.
+- Added recovery of a recent active adventure after a UI reload or brief reconnect. Recovery requires the same character and exact party roster within five minutes of the last recorded checkpoint. Observed party endings, changed rosters and expired checkpoints start a new adventure. Time away is excluded from the recorded duration, and reunion notices are not repeated for a resumed party.
+- Added up to 20 custom companion tags alongside the three presets. Create, rename, apply, search and filter your tags. Removing a custom tag requires confirmation and removes it from all companions.
+- Added a Character filter to Adventures and Companions. Companion profiles, notes and favourites remain shared across your characters in the same saved journal.
+- Added a dedicated Settings panel for recording, reunion notices, favourites-first sorting, hover reminders, private tooltip notes, recaps and the minimap button. Open it from the journal or `/ff settings`.
+- Preserved existing adventures, notes, nicknames, favourites, pins, preset tags and preferences. Forgotten active parties and companions remain suppressed when a matching party is recovered after a reload.
+
+Target: WoW Forever 1.60.1, interface 16001. Automated Lua tests cover the new features and existing behaviour; live-client verification of 0.7.0 is still required. Promotional images are labelled demonstrations rendered from the addon Lua with fictional sample data.
+
 ## 0.6.2 — Forever launch
 
 - Packaged Familiar Faces for the live WoW Forever client, version 1.60.1 (interface 16001).

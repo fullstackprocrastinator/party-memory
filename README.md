@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.6.2 · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.7.0 · Good Company · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -39,12 +39,18 @@ Join a party and the addon remembers who was there, when you played, and where y
 | **Remember the story** | Write adventure notes, pin memorable runs and view how you first met a companion. |
 | **Organise your company** | Tag helpful guides, quest buddies and people to run with again; open everyone from your latest party. |
 | **Keep a backup** | Copy the complete saved journal and settings to a private text archive. |
+| **Recognise someone on hover** | Optional player tooltip reminders show shared adventures, the last meeting and favourite status; private notes are separately opt-in. |
+| **Remember a run while it is fresh** | Optional end-of-adventure recaps provide favourite and note shortcuts, deferred during combat and loading. |
+| **Continue after a reload** | Recover the same character's exact party within five minutes of the last saved checkpoint, excluding time away. |
+| **Use your own words** | Create up to 20 private custom tags, rename them and remove them with confirmation. |
+| **Choose your character** | Filter adventures and companions by your recorded characters; companion profiles remain shared. |
+| **Settle in** | Manage preferences together in Settings or with `/ff settings`. |
 
 ### Two ways to explore your journal
 
 **Adventures** shows a sortable table of parties: date, activity, location, companions and duration. **Companions** shows unique players: class-coloured name, class, times together, last adventure and last seen. Select a companion to browse every adventure you shared; click an adventure to return to its party details.
 
-Use the activity and class buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Toggle saved **Favourites first** and **Reunion notices** preferences at the top. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
+Use the activity, class and character buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Open **Settings** for recording, favourites-first sorting, reunion notices, tooltip reminders, recaps and minimap visibility. Recaps and private tooltip notes start off. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
 
 See the [complete addon description](docs/DESCRIPTION.md) and [changelog](CHANGELOG.md).
 
@@ -52,7 +58,7 @@ See the [complete addon description](docs/DESCRIPTION.md) and [changelog](CHANGE
 
 ### Download
 
-[Download Familiar Faces 0.6.2 for WoW Forever](downloads/FamiliarFaces-0.6.2-Forever.zip?raw=true). This is the install ZIP. Other client packages are available from [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml).
+[Download Familiar Faces 0.7.0 for WoW Forever](downloads/FamiliarFaces-0.7.0-Forever.zip?raw=true). This is the install ZIP. Other client packages are available from [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml).
 
 ### Install
 
@@ -70,6 +76,7 @@ Interface/
         ├── FamiliarFaces.toc
         ├── Core.lua
         ├── Store.lua
+        ├── Tooltips.lua
         └── UI.lua
 ```
 
@@ -84,6 +91,7 @@ Select an adventure to browse its companions and location timeline, or open **Co
 | Command | Action |
 | :--- | :--- |
 | `/ff` or `/familiarfaces` | Open or close the window. |
+| `/ff settings` | Open journal preferences. |
 | `/ff pause` | Pause recording. |
 | `/ff resume` | Resume recording. |
 | `/ff notices` | Toggle reunion chat notices. |
@@ -100,7 +108,8 @@ The older `/pm` and `/partymemory` commands still work.
 - **One continuous party, one entry.** Members and locations can change without creating another entry.
 - **Dungeon visits stay remembered.** Once the party enters a dungeon, the entry keeps the latest dungeon name even after returning outdoors.
 - **Outdoor-only parties stay Questing.** This label describes an outdoor group; it does not verify quest completion.
-- **Leaving or disbanding ends the entry.** The next party starts another. Reloading the UI or pausing/resuming recording also starts a fresh entry.
+- **Leaving or disbanding ends the entry.** The next party starts another. Pausing/resuming recording starts a fresh entry too.
+- **Short reloads can resume the entry.** The same character and exact roster must return within five minutes of the last saved checkpoint. Time away is excluded, and reunion notices are preserved. Changed or expired checkpoints start another adventure. An identical party re-formed while offline cannot always be distinguished; crash recovery is limited to the state WoW last saved.
 - **Earlier records stay intact.** Old duplicates are preserved because earlier versions did not record enough information to safely merge them.
 
 Raid, arena and battleground groups are excluded. History begins when the addon is installed; previous adventures cannot be recovered. Capture waits for unknown or restricted player information and defers unit reads during combat, so very brief parties may be missed. Player encounter counts describe recorded entries, rather than completed dungeons.
@@ -121,7 +130,7 @@ Keep that file private when reporting bugs. The distribution ZIP contains code a
 
 | Package | Target | Validation |
 | :--- | :--- | :--- |
-| **Forever** | WoW Forever 1.60.1 · interface `16001` | UI loading and party recording observed in-game; full release checklist remains available below. |
+| **Forever** | WoW Forever 1.60.1 · interface `16001` | Earlier builds observed in-game; 0.7.0 passes 40 automated tests and awaits its live-client checks. |
 | Retail | Interface `120007` | Packaging target; not yet verified in-game. |
 | 335 | Legacy 3.3.5 · interface `30300` | Packaging target; not yet verified in-game. |
 

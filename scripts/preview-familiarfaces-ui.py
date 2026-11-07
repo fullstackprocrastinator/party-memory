@@ -31,7 +31,7 @@ def color(c,default):
 def text(s):
  s=html.escape(str(s or '')); s=re.sub(r'\|cff([a-fA-F0-9]{6})',r'<span style="color:#\1">',s)
  return s.replace('|r','</span>').replace('\n','<br>')
-def render(state):
+def render(state, setup=None, actions=None, title=None, caption=None):
  test=AddonTests(); test.setUp(); lua=test.lua; lua.execute(RECORD)
  if state!='empty':
   lua.execute('''
@@ -44,9 +44,11 @@ def render(state):
    FamiliarFaces.db.people['Alice-HomeRealm'].note='Patient healer. Great company.'
    FamiliarFaces.db.people['Alice-HomeRealm'].favourite=true
   ''')
+ if setup: lua.execute(setup)
  lua.execute("SlashCmdList.FAMILIARFACES('')")
  if state=='adventures': lua.execute("for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end")
  if state=='companions': lua.execute("clickText('Companions'); for _,b in ipairs(buttons) do if b.entry and b.entry.name=='Alice-HomeRealm' then b.scripts.OnClick(b); break end end")
+ if actions: lua.execute(actions)
  frames={int(f['previewId']):f for f in lua.globals().frames.values() if f['previewId']}
  children={}
  for key,f in frames.items():
@@ -85,8 +87,14 @@ def render(state):
   if kind!='Texture': body+=''.join(element(k) for k in children.get(key,[]))
   return '<div class="region" style="'+';'.join(css)+'">'+body+'</div>'
  page='<!doctype html><meta charset="utf-8"><title>Familiar Faces layout preview</title><style>body{margin:0;background:#172935;font:12px Arial;color:#eee}.region{position:absolute;box-sizing:border-box}.window{position:relative;width:1120px;height:880px;margin:20px}img{display:block}</style><p style="margin:20px">Familiar Faces · Lua layout preview · Sample data · Native icons and input skins are placeholders</p><div class="window">'+''.join(element(k) for k in children.get(0,[]))+'</div>'
+ if title:
+  start=page.index('<p style="margin:20px">'); end=page.index('</p>',start)+4
+  heading='<header style="padding:28px 30px 8px"><div style="color:#e6b967;font-size:12px;letter-spacing:2px">FAMILIAR FACES  /  0.7.0 GOOD COMPANY</div><h1 style="margin:10px 0;color:#f5deb0;font:32px Georgia">'+html.escape(title)+'</h1><div style="font-size:15px;color:#d4e2df">'+html.escape(caption or '')+'</div></header>'
+  page=page[:start]+heading+page[end:]
+  page+='<footer style="padding:0 30px 24px;color:#bed0d0;font-size:12px">Demonstration with sample data rendered from the addon Lua. Native icons and input skins are placeholders. Created by SqueezyLemons.</footer>'
  (DEST/(state+'.html')).write_text(page,encoding='utf-8')
-DEST.mkdir(parents=True,exist_ok=True)
-Image.open(ROOT/'FamiliarFaces'/'Textures'/'Wordmark.tga').save(DEST/'Wordmark.png')
-for state in ('empty','adventures','companions'): render(state)
-print(DEST)
+if __name__=='__main__':
+ DEST.mkdir(parents=True,exist_ok=True)
+ Image.open(ROOT/'FamiliarFaces'/'Textures'/'Wordmark.tga').save(DEST/'Wordmark.png')
+ for state in ('empty','adventures','companions'): render(state)
+ print(DEST)

@@ -48,7 +48,7 @@ function CreateFrame(kind,name,parent,template)
   StartMoving=noop, StopMovingOrSizing=noop, SetClampedToScreen=noop,
   SetHighlightTexture=noop, SetAutoFocus=noop, SetMaxLetters=noop,
   ClearFocus=noop, SetAllPoints=noop, SetTexture=noop, SetVertexColor=noop,
-  SetTextColor=noop,
+  SetAlpha=noop, SetTexCoord=noop, SetTextColor=noop,
   SetFocus=noop, HighlightText=noop,
   SetText=function(self,t) self.text=t; if self.scripts.OnTextChanged then self.scripts.OnTextChanged(self) end end,
   GetText=function(self) return self.text end,
@@ -73,7 +73,7 @@ class AddonTests(unittest.TestCase):
     def setUp(self):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.lua.execute(MOCKS)
-        for name in ('Store.lua', 'Core.lua', 'UI.lua'):
+        for name in ('Store.lua', 'Core.lua', 'Tooltips.lua', 'UI.lua'):
             self.lua.execute((ROOT / 'FamiliarFaces' / name).read_text(encoding='utf-8'))
         self.lua.execute("frames[1].scripts.OnEvent(frames[1], 'ADDON_LOADED', 'FamiliarFaces')")
 
@@ -448,6 +448,243 @@ class AddonTests(unittest.TestCase):
           assert(#FamiliarFaces.db.sessions==1 and FamiliarFaces.active==session and session.zone=='Deadmines')
           assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==1)
           roster={}; clock=clock+6; FamiliarFaces.Capture(); assert(FamiliarFaces.active==nil)
+        ''')
+
+    def reload_addon(self):
+        """Reload a serialized SavedVariables snapshot into a fresh Lua VM."""
+        backup = self.lua.eval('FamiliarFaces.Export()')
+        now = self.lua.eval('clock')
+        self.setUp()
+        self.lua.execute(backup)
+        self.lua.execute('FamiliarFaces.Init(FamiliarFacesDB)')
+        self.lua.globals().clock = now
+
+    def test_reload_resumes_without_duplicate_or_reunion_and_excludes_gap(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); clock=1060; FamiliarFaces.Capture()
+          FamiliarFaces.db.people['Alice-OtherRealm'].note='Keep me'
+        ''')
+        self.reload_addon()
+        self.lua.execute('''
+          local messages=0; FamiliarFaces.NotifyReunion=function() messages=messages+1 end
+          clock=1120; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==1 and FamiliarFaces.active.id==1)
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==1)
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Keep me' and messages==0)
+          assert(FamiliarFaces.Duration(FamiliarFaces.active)==60)
+          clock=1180; FamiliarFaces.Capture(); assert(FamiliarFaces.Duration(FamiliarFaces.active)==120)
+        ''')
+        self.reload_addon()
+        self.lua.execute('clock=1200; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==1 and FamiliarFaces.Duration(FamiliarFaces.active)==120)')
+
+    def test_resume_rejects_changed_roster_character_expired_or_closed_party(self):
+        for change in (
+            "roster[1].name='Bob'", "clock=1401",
+            "local old=UnitName; UnitName=function(u) if u=='player' then return 'Alt','Home Realm' end; return old(u) end",
+            "FamiliarFaces.db.sessions[1].ended=1000",
+            "roster[2]={name='Bob',realm='Home Realm',class='WARRIOR'}",
+        ):
+            with self.subTest(change=change):
+                self.setUp(); self.lua.execute('FamiliarFaces.Capture()'); self.reload_addon()
+                self.lua.execute(change + '; FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==2)')
+                self.lua.execute('assert(FamiliarFaces.db.sessions[2].ended==1000)')
+
+    def test_resume_waits_for_loading_roster_but_solo_login_invalidates(self):
+        self.lua.execute('FamiliarFaces.Capture()'); self.reload_addon()
+        self.lua.execute('''
+          roster={}; frames[1].scripts.OnEvent(frames[1],'PLAYER_ENTERING_WORLD')
+          assert(FamiliarFaces.pendingResume)
+          clock=1002; roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==1)
+        ''')
+        self.reload_addon()
+        self.lua.execute('''
+          roster={}; frames[1].scripts.OnEvent(frames[1],'PLAYER_ENTERING_WORLD')
+          clock=1010; FamiliarFaces.Capture(); assert(not FamiliarFaces.pendingResume and not FamiliarFaces.db.continuity)
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; FamiliarFaces.Capture()
+          assert(#FamiliarFaces.db.sessions==2)
+        ''')
+
+    def test_forgotten_party_and_companion_stay_forgotten_through_reload(self):
+        self.lua.execute('FamiliarFaces.Capture(); FamiliarFaces.ForgetAdventure(FamiliarFaces.active)')
+        self.reload_addon()
+        self.lua.execute('FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==0)')
+        self.setUp()
+        self.lua.execute('''
+          roster[2]={name='Bob',realm='Home Realm',class='WARRIOR'}; FamiliarFaces.Capture()
+          FamiliarFaces.ForgetPerson('Alice-OtherRealm')
+        ''')
+        self.reload_addon()
+        self.lua.execute('''
+          roster[2]={name='Bob',realm='Home Realm',class='WARRIOR'}; FamiliarFaces.Capture()
+          assert(not FamiliarFaces.db.people['Alice-OtherRealm'] and #FamiliarFaces.active.members==1)
+        ''')
+        self.setUp()
+        self.lua.execute("FamiliarFaces.Capture(); FamiliarFaces.ForgetPerson('Alice-OtherRealm')")
+        self.reload_addon()
+        self.lua.execute("FamiliarFaces.Capture(); assert(not FamiliarFaces.db.people['Alice-OtherRealm'] and #FamiliarFaces.db.sessions==0)")
+
+    def test_custom_tags_validation_rename_delete_and_persistence(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); local p=FamiliarFaces.db.people['Alice-OtherRealm']
+          assert(FamiliarFaces.CreateTag('  Evening regular  ')=='Evening regular')
+          assert(not FamiliarFaces.CreateTag('EVENING REGULAR'))
+          assert(not FamiliarFaces.CreateTag('Helpful guide'))
+          assert(not FamiliarFaces.CreateTag('bad|tag'))
+          assert(not FamiliarFaces.CreateTag(string.rep('x',49)))
+          FamiliarFaces.ToggleTag(p,'Evening regular')
+          assert(FamiliarFaces.RenameTag('Evening regular','Evening friend')=='Evening friend')
+          assert(not p.tags['Evening regular'] and p.tags['Evening friend'])
+          assert(#FamiliarFaces.Query('Companions',{tag='Evening friend'})==1)
+          assert(#FamiliarFaces.Query('Adventures',{query='evening friend'})==1)
+          assert(not FamiliarFaces.DeleteTag('Helpful guide'))
+        ''')
+        self.reload_addon()
+        self.lua.execute('''
+          assert(FamiliarFaces.db.customTags[1]=='Evening friend')
+          assert(FamiliarFaces.DeleteTag('Evening friend'))
+          assert(not FamiliarFaces.db.people['Alice-OtherRealm'].tags['Evening friend'])
+          for i=1,20 do assert(FamiliarFaces.CreateTag('Tag '..i)) end
+          assert(not FamiliarFaces.CreateTag('One too many'))
+        ''')
+
+    def test_tag_editor_create_rename_confirm_remove_and_filter(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); FamiliarFaces.Toggle(); clickText('Companions')
+          for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end
+          clickText('Private tags'); FamiliarFacesTagName:SetText('Evening regular'); clickText('Create tag')
+          clickText('Evening regular [off]'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].tags['Evening regular'])
+          local function editTag() for _,b in ipairs(buttons) do if b.caption=='Edit' and b:IsShown() then b.scripts.OnClick(b); return end end end
+          editTag(); FamiliarFacesTagName:SetText('Evening friend'); clickText('Rename tag')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].tags['Evening friend'])
+          editTag(); clickText('Remove tag'); assert(#FamiliarFaces.db.customTags==1)
+          clickText('Confirm removal'); assert(#FamiliarFaces.db.customTags==0)
+          for i=1,9 do FamiliarFaces.CreateTag('Custom '..i) end
+          clickText('More tags'); clickText('Custom 9 [off]')
+          assert(FamiliarFaces.db.people['Alice-OtherRealm'].tags['Custom 9'])
+        ''')
+
+    def test_character_filter_both_views_without_orphan_leak(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); FamiliarFaces.EndSession(clock)
+          FamiliarFaces.Record('Alt-HomeRealm',{{name='Bob-HomeRealm',class='WARRIOR'}},{kind='Questing',zone='Westfall'},1100)
+          FamiliarFaces.db.people['Orphan-HomeRealm']={name='Orphan-HomeRealm',favourite=true}
+          assert(#FamiliarFaces.Query('Adventures',{owner='Me-HomeRealm'})==1)
+          local people=FamiliarFaces.Query('Companions',{owner='Alt-HomeRealm'})
+          assert(#people==1 and people[1].name=='Bob-HomeRealm')
+          assert(#FamiliarFaces.Query('Companions',{owner='Alt-HomeRealm',query='Alice'})==0)
+          assert(#FamiliarFaces.Characters()==2)
+          FamiliarFaces.Toggle(); clickText('Character: All')
+          local shown=0; for _,b in ipairs(buttons) do if b.entry then shown=shown+1; assert(b.entry.owner=='Alt-HomeRealm') end end
+          assert(shown==1); clickText('Clear filters')
+          shown=0; for _,b in ipairs(buttons) do if b.entry then shown=shown+1 end end; assert(shown==2)
+        ''')
+
+    def test_tooltip_reminders_are_private_optional_and_skip_restricted_units(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); local p=FamiliarFaces.db.people['Alice-OtherRealm']; p.note='Private test'; p.favourite=true
+          local lines=FamiliarFaces.TooltipLines(p.name)
+          assert(table.concat(lines,' '):find('favourite') and not table.concat(lines,' '):find('Private test'))
+          FamiliarFaces.db.tooltipNotes=true
+          assert(table.concat(FamiliarFaces.TooltipLines(p.name),' '):find('Private test'))
+          GameTooltip=CreateFrame('GameTooltip'); GameTooltip.lines={}
+          GameTooltip.GetUnit=function() return 'Alice','party1' end
+          GameTooltip.AddLine=function(self,s) table.insert(self.lines,s) end
+          UnitIsPlayer=function() return true end
+          FamiliarFaces.AddUnitTooltip(GameTooltip); local count=#GameTooltip.lines; assert(count>1)
+          FamiliarFaces.AddUnitTooltip(GameTooltip); assert(#GameTooltip.lines==count)
+          GameTooltip.familiarFacesName=nil; combat=true; FamiliarFaces.AddUnitTooltip(GameTooltip); assert(#GameTooltip.lines==count)
+          combat=false; UnitIsPlayer=function() return false end; FamiliarFaces.AddUnitTooltip(GameTooltip); assert(#GameTooltip.lines==count)
+          local restricted={}; issecretvalue=function(v) return rawequal(v,restricted) end
+          GameTooltip.GetUnit=function() return 'Alice',restricted end
+          FamiliarFaces.AddUnitTooltip(GameTooltip); assert(#GameTooltip.lines==count)
+          FamiliarFaces.db.tooltips=false; assert(not FamiliarFaces.TooltipLines(p.name))
+        ''')
+
+    def test_tooltip_modern_and_legacy_hook_registration(self):
+        for modern in (False, True):
+            with self.subTest(modern=modern):
+                self.setUp()
+                self.lua.execute('''
+                  GameTooltip=CreateFrame('GameTooltip')
+                  GameTooltip.HookScript=function(self,event,fn) self.scripts[event]=fn end
+                  GameTooltip.lines={}; GameTooltip.AddLine=function(self,s) table.insert(self.lines,s) end
+                  GameTooltip.GetUnit=function() return 'Alice','party1' end
+                ''')
+                if modern:
+                    self.lua.execute('Enum={TooltipDataType={Unit=2}}; TooltipDataProcessor={AddTooltipPostCall=function(kind,fn) assert(kind==2); callback=fn end}')
+                self.lua.execute('''
+                  FamiliarFaces.InitTooltips(); FamiliarFaces.Capture()
+                  local fn=callback or GameTooltip.scripts.OnTooltipSetUnit
+                  assert(fn); fn(GameTooltip); assert(#GameTooltip.lines>1)
+                  GameTooltip.scripts.OnTooltipCleared(GameTooltip); assert(not GameTooltip.familiarFacesName)
+                ''')
+
+    def test_recap_opt_in_defers_combat_and_opens_note(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); roster={}; FamiliarFaces.Capture()
+          FamiliarFaces.MaybeShowRecap(); assert(not FamiliarFacesRecap)
+          FamiliarFaces.db.recaps=true
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; FamiliarFaces.Capture()
+          clock=1060; combat=true; roster={}; FamiliarFaces.Capture(); FamiliarFaces.MaybeShowRecap()
+          assert(FamiliarFaces.pendingRecap and not FamiliarFacesRecap)
+          combat=false; FamiliarFaces.MaybeShowRecap(); assert(FamiliarFacesRecap:IsShown())
+          clickText('Favourite'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].favourite)
+          clickText('Add note'); assert(FamiliarFacesWindow:IsShown() and not FamiliarFacesRecap:IsShown())
+          clickText('Helpful'); clickText('Save note'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Helpful')
+        ''')
+
+    def test_recap_pagination_suppression_and_stale_entries(self):
+        self.lua.execute('''
+          FamiliarFaces.db.recaps=true; FamiliarFaces.Capture()
+          for i=1,6 do roster={{name='Person'..i,realm='Home Realm',class='WARRIOR'}}; FamiliarFaces.Capture() end
+          roster={}; FamiliarFaces.Capture(); FamiliarFaces.MaybeShowRecap()
+          assert(FamiliarFacesRecap:IsShown()); clickText('Next'); clickText('Keep adventuring')
+          FamiliarFaces.MaybeShowRecap(); assert(not FamiliarFacesRecap:IsShown())
+          roster={{name='Alice',realm='Other Realm',class='PRIEST'}}; FamiliarFaces.Capture()
+          SlashCmdList.FAMILIARFACES('pause'); assert(not FamiliarFaces.pendingRecap)
+          SlashCmdList.FAMILIARFACES('resume'); raid=true; FamiliarFaces.Capture(); assert(not FamiliarFaces.pendingRecap)
+          raid=false; FamiliarFaces.Capture(); roster={}; FamiliarFaces.Capture()
+          FamiliarFaces.ForgetAdventure(FamiliarFaces.pendingRecap); FamiliarFaces.MaybeShowRecap()
+          assert(not FamiliarFacesRecap:IsShown())
+        ''')
+
+    def test_settings_defaults_persistence_and_clear(self):
+        self.lua.execute('''
+          assert(FamiliarFaces.db.tooltips and not FamiliarFaces.db.tooltipNotes and not FamiliarFaces.db.recaps)
+          SlashCmdList.FAMILIARFACES('settings'); assert(FamiliarFacesSettings:IsShown())
+          clickText('End-of-adventure recaps: off'); clickText('Private notes in hover reminders: off')
+          clickText('Favourites first: on'); clickText('Reunion notices: on'); clickText('Minimap button: on')
+          assert(FamiliarFaces.db.recaps and FamiliarFaces.db.tooltipNotes and FamiliarFaces.db.minimap.hidden)
+          SlashCmdList.FAMILIARFACES('clear confirm')
+          assert(FamiliarFaces.db.recaps and FamiliarFaces.db.tooltipNotes and not FamiliarFaces.db.favouritesFirst)
+        ''')
+        self.reload_addon()
+        self.lua.execute('assert(FamiliarFaces.db.recaps and FamiliarFaces.db.tooltipNotes and FamiliarFaces.db.minimap.hidden)')
+
+    def test_recap_waits_for_dialogs_expires_and_hides_in_combat(self):
+        self.lua.execute('''
+          FamiliarFaces.db.recaps=true; FamiliarFaces.Capture(); roster={}; FamiliarFaces.Capture()
+          SlashCmdList.FAMILIARFACES('settings'); FamiliarFaces.MaybeShowRecap(); assert(not FamiliarFacesRecap)
+          FamiliarFacesSettings:Hide(); FamiliarFaces.MaybeShowRecap(); assert(FamiliarFacesRecap:IsShown())
+          combat=true; FamiliarFaces.MaybeShowRecap(); assert(not FamiliarFacesRecap:IsShown() and FamiliarFaces.pendingRecap)
+          combat=false; FamiliarFaces.MaybeShowRecap(); assert(FamiliarFacesRecap:IsShown())
+          clickText('Keep adventuring')
+          FamiliarFaces.QueueRecap(FamiliarFaces.db.sessions[1]); clock=clock+601
+          FamiliarFaces.MaybeShowRecap(); assert(not FamiliarFacesRecap:IsShown() and not FamiliarFaces.pendingRecap)
+        ''')
+
+    def test_recap_note_navigation_preserves_unsaved_draft(self):
+        self.lua.execute('''
+          FamiliarFaces.db.recaps=true; FamiliarFaces.Capture(); FamiliarFaces.Toggle()
+          for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end
+          local fields={}; for _,f in ipairs(frames) do if f.kind=='EditBox' then fields[#fields+1]=f end end
+          fields[2]:SetText('Keep this adventure draft'); roster={}; FamiliarFaces.Capture(); FamiliarFaces.MaybeShowRecap()
+          clickText('Add note'); assert(FamiliarFacesDraftDialog:IsShown())
+          clickText('Cancel'); assert(fields[2]:GetText()=='Keep this adventure draft')
+          clickText('Add note'); clickText('Save')
+          assert(FamiliarFaces.db.sessions[1].note=='Keep this adventure draft' and not FamiliarFacesRecap:IsShown())
+          clickText('Helpful'); clickText('Save note'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Helpful')
         ''')
 
 if __name__ == '__main__':

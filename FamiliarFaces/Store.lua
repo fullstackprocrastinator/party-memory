@@ -2,6 +2,96 @@ FamiliarFaces = FamiliarFaces or {}
 local PM = FamiliarFaces
 
 PM.TagChoices={"Helpful guide","Quest buddy","Run again"}
+PM.ResumeWindow=300
+
+function PM.AllTags()
+    local tags={}
+    for _,tag in ipairs(PM.TagChoices) do tags[#tags+1]=tag end
+    for _,tag in ipairs(PM.db.customTags or {}) do tags[#tags+1]=tag end
+    return tags
+end
+local function validTag(text, previous)
+    text=type(text)=="string" and text:match("^%s*(.-)%s*$") or ""
+    if text=="" or #text>48 or text:find("[%c|]") then return nil,"Use 1-48 bytes, without control characters or |." end
+    for _,tag in ipairs(PM.AllTags()) do
+        if tag~=previous and tag:lower()==text:lower() then return nil,"That tag already exists." end
+    end
+    return text
+end
+function PM.CreateTag(text)
+    if #PM.db.customTags>=20 then return nil,"You can keep up to 20 custom tags." end
+    local tag,err=validTag(text); if not tag then return nil,err end
+    table.insert(PM.db.customTags,tag); return tag
+end
+function PM.RenameTag(previous,text)
+    local tag,err=validTag(text,previous); if not tag then return nil,err end
+    for i,old in ipairs(PM.db.customTags) do
+        if old==previous then
+            PM.db.customTags[i]=tag
+            for _,person in pairs(PM.db.people) do
+                if person.tags and person.tags[old] then person.tags[old]=nil; person.tags[tag]=true end
+            end
+            return tag
+        end
+    end
+    return nil,"Preset tags cannot be renamed."
+end
+function PM.DeleteTag(tag)
+    for i,old in ipairs(PM.db.customTags) do
+        if old==tag then
+            table.remove(PM.db.customTags,i)
+            for _,person in pairs(PM.db.people) do if person.tags then person.tags[tag]=nil end end
+            return true
+        end
+    end
+    return false
+end
+function PM.Characters()
+    local names,seen={},{}
+    for _,s in ipairs(PM.db.sessions) do
+        if not seen[s.owner] then seen[s.owner]=true; names[#names+1]=s.owner end
+    end
+    if PM.currentOwner and not seen[PM.currentOwner] then names[#names+1]=PM.currentOwner end
+    table.sort(names); return names
+end
+function PM.HasAdventure(target)
+    for _,s in ipairs(PM.db.sessions) do if s==target then return true end end
+    return false
+end
+function PM.Duration(session)
+    return math.max(0,(session.ended or session.lastSeen)-session.started-(session.awaySeconds or 0))
+end
+
+local function rosterKey(members)
+    local names={}; for _,member in ipairs(members) do names[#names+1]=member.name end
+    table.sort(names); return table.concat(names,"\n")
+end
+function PM.Checkpoint(owner,members,now)
+    if not PM.db.enabled then PM.db.continuity=nil; return end
+    PM.db.continuity={id=PM.active and PM.active.id,owner=owner,roster=rosterKey(members),at=now,
+        notified=PM.notified,ignored=PM.ignored,suppressed=PM.suppressParty}
+end
+function PM.TryResume(owner,members,now)
+    local saved=PM.pendingResume
+    PM.pendingResume=nil
+    if not saved then return end
+    PM.db.continuity=nil
+    local session
+    for _,s in ipairs(PM.db.sessions) do if saved.id and s.id==saved.id then session=s; break end end
+    local matches=PM.db.enabled and saved.owner==owner and type(saved.at)=="number"
+        and now>=saved.at and now-saved.at<=PM.ResumeWindow and saved.roster==rosterKey(members)
+    if matches and ((session and not session.ended) or saved.suppressed) then
+        PM.active=session; PM.notified=saved.notified or {}; PM.ignored=saved.ignored; PM.suppressParty=saved.suppressed
+        if session then
+            session.awaySeconds=(session.awaySeconds or 0)+math.max(0,now-session.lastSeen)
+            -- Begin a new observed location span; time spent offline is not a visit.
+            session.resumed=true
+        end
+        return true
+    end
+    if session and not session.ended then session.ended=session.lastSeen end
+    return false
+end
 function PM.FirstAdventure(name)
     local first
     for _,session in ipairs(PM.db.sessions) do
@@ -86,6 +176,8 @@ function PM.ForgetAdventure(target)
         if session==target then
             table.remove(PM.db.sessions,i)
             if PM.active==target then PM.active=nil; PM.suppressParty=true end
+            if PM.pendingRecap==target then PM.pendingRecap=nil end
+            if PM.db.continuity and PM.db.continuity.id==target.id then PM.db.continuity.id=nil; PM.db.continuity.suppressed=true end
             PM.RebuildPeople(); return true
         end
     end
@@ -94,6 +186,7 @@ end
 function PM.ForgetPerson(name)
     if not PM.db.people[name] then return end
     PM.ignored=PM.ignored or {}; PM.ignored[name]=true
+    if PM.db.continuity then PM.db.continuity.ignored=PM.ignored end
     for i=#PM.db.sessions,1,-1 do
         local session=PM.db.sessions[i]
         for j=#session.members,1,-1 do
@@ -101,7 +194,11 @@ function PM.ForgetPerson(name)
         end
         if #session.members==0 then
             table.remove(PM.db.sessions,i)
-            if PM.active==session then PM.active=nil; PM.suppressParty=true end
+            if PM.active==session then
+                PM.active=nil; PM.suppressParty=true
+                if PM.db.continuity then PM.db.continuity.id=nil; PM.db.continuity.suppressed=true end
+            end
+            if PM.pendingRecap==session then PM.pendingRecap=nil end
         end
     end
     PM.db.people[name]=nil; PM.RebuildPeople(); return true
@@ -109,7 +206,7 @@ end
 
 function PM.Init(db)
     db = db or {}
-    db.version = 5
+    db.version = 6
     db.sessions = db.sessions or {}
     db.people = db.people or {}
     db.nextID = db.nextID or 1
@@ -117,20 +214,33 @@ function PM.Init(db)
     db.reunionNotices = db.reunionNotices ~= false
     db.favouritesFirst = db.favouritesFirst ~= false
     db.minimap = db.minimap or {hidden=false,angle=220}
+    db.customTags = db.customTags or {}
+    db.tooltips = db.tooltips ~= false
+    db.tooltipNotes = db.tooltipNotes == true
+    db.recaps = db.recaps == true
+    PM.active=nil; PM.notified=nil; PM.ignored=nil; PM.suppressParty=nil; PM.currentParty={}
+    PM.pendingResume=db.continuity
     PM.db = db
     return db
 end
 
-function PM.EndSession(now, keepParty)
-    if PM.active then PM.active.ended = now end
+function PM.EndSession(now, keepParty, recap)
+    local ended=PM.active
+    if ended then ended.ended = now end
     PM.active = nil
+    if PM.pendingResume then
+        for _,s in ipairs(PM.db.sessions) do if s.id==PM.pendingResume.id and not s.ended then s.ended=s.lastSeen end end
+    end
+    PM.pendingResume=nil; PM.db.continuity=nil
     if not keepParty then PM.notified = nil; PM.ignored=nil; PM.suppressParty=nil end
+    if recap and ended and PM.db.recaps and PM.QueueRecap then PM.QueueRecap(ended) end
 end
 
 function PM.Record(owner, members, context, now)
     local db = PM.db
     if #members == 0 then PM.EndSession(now); return end
     if not db.enabled then PM.EndSession(now,true); return end
+    if PM.pendingResume then PM.TryResume(owner,members,now) end
     if PM.suppressParty then return end
     local session = PM.active
     if session and session.owner ~= owner then PM.EndSession(now); session = nil end
@@ -143,11 +253,12 @@ function PM.Record(owner, members, context, now)
         PM.active = session
     end
     local location = session.locations[#session.locations]
-    if not location or location.zone ~= context.zone or location.kind ~= context.kind
+    if session.resumed or not location or location.zone ~= context.zone or location.kind ~= context.kind
         or location.difficulty ~= context.difficulty then
         location = {zone = context.zone, kind = context.kind, difficulty = context.difficulty, started = now}
         session.locations[#session.locations + 1] = location
     end
+    session.resumed=nil
     location.lastSeen = now
     -- Retain the latest dungeon as the title even after returning outdoors.
     if context.kind == "Dungeon" or session.kind ~= "Dungeon" then
@@ -220,6 +331,7 @@ function PM.Query(view, options)
         for _, location in ipairs(session.locations or {}) do locationText = locationText .. " " .. location.zone end
         local recent = (not options.days or session.lastSeen >= time()-options.days*86400)
             and (not options.recentParty or session==latestParty)
+            and (not options.owner or session.owner==options.owner)
         local matchingMember, matchesQuery = false, string.find(string.lower(locationText), query, 1, true) ~= nil
         for _, member in ipairs(session.members) do
             local person = PM.db.people[member.name] or {name = member.name, class = member.class}
@@ -244,7 +356,7 @@ function PM.Query(view, options)
             results[#results + 1] = session
         end
     end
-    if view == "Companions" and not options.kind and not options.days and not options.recentParty then
+    if view == "Companions" and not options.owner and not options.kind and not options.days and not options.recentParty then
         for name,person in pairs(PM.db.people) do
             if not seen[name] and (not options.class or person.class==options.class)
                 and (not options.favourites or person.favourite)
@@ -270,7 +382,7 @@ function PM.Query(view, options)
         if key == "kind" then return item.kind end
         if key == "zone" then return string.lower(item.zone) end
         if key == "members" then return #item.members end
-        if key == "duration" then return math.max(0, (item.ended or item.lastSeen) - item.started) end
+        if key == "duration" then return PM.Duration(item) end
         return item.started
     end
     table.sort(results, function(a, b)

@@ -13,6 +13,8 @@ local pendingForget, forgetDialog, forgetMessage
 local nickname, draftDialog, pendingNavigation, allowHide
 local tagDialog, exportDialog, exportField, exportPageLabel
 local exportText, exportPage, exportParts = "",1,{}
+local settingsDialog, recapDialog, recapSession, recapPage
+local refreshTags, refreshSettings, refreshRecap
 local function showCreator()
     if not creatorDialog then
         creatorDialog=CreateFrame("Frame",nil,window); creatorDialog:SetSize(620,140); creatorDialog:SetPoint("CENTER"); creatorDialog:EnableMouse(true)
@@ -103,23 +105,112 @@ local function guard(fn)
     draftDialog:Show()
 end
 local function showTags()
-    if not selectedPerson then return end
     if not tagDialog then
-        tagDialog=CreateFrame("Frame",nil,window); tagDialog:SetSize(420,230); tagDialog:SetPoint("CENTER"); tagDialog:SetFrameStrata("FULLSCREEN_DIALOG"); tagDialog:EnableMouse(true)
+        tagDialog=CreateFrame("Frame","FamiliarFacesTags",window); tagDialog:SetSize(540,510); tagDialog:SetPoint("CENTER"); tagDialog:SetFrameStrata("FULLSCREEN_DIALOG"); tagDialog:EnableMouse(true)
+        table.insert(UISpecialFrames,"FamiliarFacesTags")
         fill(tagDialog,0.025,0.065,0.085); border(tagDialog)
-        label(tagDialog,"Private companion tags - click to toggle",20,-20,380,"GameFontNormal")
-        tagDialog.buttons={}
-        for i,tag in ipairs(PM.TagChoices) do
-            tagDialog.buttons[i]=button(tagDialog,tag,20,-55-(i-1)*36,380,function()
-                local person=tagDialog.person
-                if person and PM.db.people[person.name]==person then PM.ToggleTag(person,tag); tagDialog.buttons[i]:SetText(tag..(PM.HasTag(person,tag) and " [on]" or " [off]")); PM.Refresh() end
+        label(tagDialog,"Your private companion tags",20,-20,500,"GameFontNormalLarge")
+        tagDialog.hint=label(tagDialog,"",20,-49,500)
+        tagDialog.buttons={}; tagDialog.editButtons={}
+        for i=1,6 do
+            local row=i
+            tagDialog.buttons[i]=button(tagDialog,"",20,-80-(i-1)*35,390,function()
+                local tag=PM.AllTags()[(tagDialog.page-1)*6+row]; local person=tagDialog.person
+                if tag and person and PM.db.people[person.name]==person then PM.ToggleTag(person,tag); refreshTags(); PM.Refresh() end
+            end)
+            tagDialog.editButtons[i]=button(tagDialog,"Edit",420,-80-(i-1)*35,100,function()
+                tagDialog.editing=PM.AllTags()[(tagDialog.page-1)*6+row]
+                tagDialog.field:SetText(tagDialog.editing or ""); refreshTags()
             end)
         end
-        button(tagDialog,"Done",20,-181,380,function() tagDialog:Hide() end)
+        button(tagDialog,"Previous tags",20,-294,150,function() tagDialog.page=math.max(1,tagDialog.page-1); refreshTags() end)
+        tagDialog.pageLabel=label(tagDialog,"",185,-301,150)
+        button(tagDialog,"More tags",370,-294,150,function() tagDialog.page=math.min(math.ceil(#PM.AllTags()/6),tagDialog.page+1); refreshTags() end)
+        label(tagDialog,"New tag, or choose Edit to rename an existing tag",20,-334,500)
+        tagDialog.field=CreateFrame("EditBox","FamiliarFacesTagName",tagDialog,"InputBoxTemplate")
+        tagDialog.field:SetSize(488,26); tagDialog.field:SetPoint("TOPLEFT",26,-357); tagDialog.field:SetAutoFocus(false); tagDialog.field:SetMaxLetters(48)
+        tagDialog.field:SetScript("OnEscapePressed",tagDialog.field.ClearFocus)
+        tagDialog.field:SetScript("OnTextChanged",function() tagDialog.confirm=nil; if tagDialog.remove then tagDialog.remove:SetText("Remove tag") end end)
+        local function result(value,err)
+            tagDialog.message:SetText(value and "Saved. Your companion tags are up to date." or err or "Choose a custom tag to edit.")
+            if value then tagDialog.field:SetText(""); tagDialog.editing=nil end
+            refreshTags(); PM.Refresh()
+        end
+        button(tagDialog,"Create tag",20,-393,160,function() result(PM.CreateTag(tagDialog.field:GetText())) end)
+        button(tagDialog,"Rename tag",190,-393,160,function()
+            local old=tagDialog.editing
+            local new,err=PM.RenameTag(old,tagDialog.field:GetText())
+            if new and options.tag==old then options.tag=new end
+            result(new,err)
+        end)
+        tagDialog.remove=button(tagDialog,"Remove tag",360,-393,160,function()
+            local tag=tagDialog.editing
+            if not tag then result(nil,"Choose Edit beside a custom tag first."); return end
+            if tagDialog.confirm~=tag then
+                tagDialog.confirm=tag; tagDialog.remove:SetText("Confirm removal")
+                tagDialog.message:SetText("Remove this tag from every companion? Click again to confirm."); return
+            end
+            local removed=PM.DeleteTag(tag)
+            if options.tag==tag then options.tag=nil end
+            result(removed); tagDialog.remove:SetText("Remove tag")
+        end)
+        tagDialog.message=label(tagDialog,"",20,-433,500); tagDialog.message:SetHeight(30)
+        button(tagDialog,"Done",20,-470,500,function() tagDialog:Hide() end)
+        tagDialog:SetScript("OnHide",function() tagDialog.field:ClearFocus() end)
     end
-    tagDialog.person=selectedPerson
-    for i,tag in ipairs(PM.TagChoices) do tagDialog.buttons[i]:SetText(tag..(PM.HasTag(selectedPerson,tag) and " [on]" or " [off]")) end
-    tagDialog:Show()
+    tagDialog.person=selectedPerson; tagDialog.page=1; tagDialog.editing=nil; tagDialog.field:SetText(""); tagDialog.message:SetText("")
+    refreshTags(); tagDialog:Show()
+end
+refreshTags=function()
+    local tags=PM.AllTags(); tagDialog.page=math.max(1,math.min(tagDialog.page,math.ceil(#tags/6)))
+    tagDialog.hint:SetText(tagDialog.person and ("Click a tag to toggle it for "..tagDialog.person.name) or "Manage your tags. Select a companion to apply them.")
+    tagDialog.pageLabel:SetText("Page "..tagDialog.page.." / "..math.ceil(#tags/6))
+    for i,b in ipairs(tagDialog.buttons) do
+        local index=(tagDialog.page-1)*6+i; local tag=tags[index]; local edit=tagDialog.editButtons[i]
+        if tag then
+            b:SetText(tag..(tagDialog.person and (PM.HasTag(tagDialog.person,tag) and " [on]" or " [off]") or "")); b:Show()
+            if index>#PM.TagChoices then edit:Show() else edit:Hide() end
+        else b:Hide(); edit:Hide() end
+    end
+end
+
+function PM.ShowSettings()
+    if not window then PM.Toggle() elseif not window:IsShown() then window:Show() end
+    if not settingsDialog then
+        settingsDialog=CreateFrame("Frame","FamiliarFacesSettings",window); settingsDialog:SetSize(560,570); settingsDialog:SetPoint("CENTER")
+        settingsDialog:SetFrameStrata("FULLSCREEN_DIALOG"); settingsDialog:EnableMouse(true); table.insert(UISpecialFrames,"FamiliarFacesSettings")
+        fill(settingsDialog,0.025,0.065,0.085); border(settingsDialog)
+        label(settingsDialog,"Make yourself at home",24,-22,512,"GameFontNormalLarge")
+        label(settingsDialog,"Familiar Faces 0.7.0 - your journal, your preferences",24,-53,512)
+        settingsDialog.toggles={}
+        local choices={{"Recording","enabled"},{"Reunion notices","reunionNotices"},{"Favourites first","favouritesFirst"},
+            {"Player hover reminders","tooltips"},{"Private notes in hover reminders","tooltipNotes"},{"End-of-adventure recaps","recaps"},{"Minimap button","minimap"}}
+        for i,choice in ipairs(choices) do
+            local title,key=choice[1],choice[2]
+            settingsDialog.toggles[i]=button(settingsDialog,"",24,-85-(i-1)*37,512,function()
+                if key=="minimap" then PM.db.minimap.hidden=not PM.db.minimap.hidden; PM.InitMinimap()
+                elseif key=="enabled" then SlashCmdList.FAMILIARFACES(PM.db.enabled and "pause" or "resume")
+                else PM.db[key]=not PM.db[key] end
+                if key=="recaps" and not PM.db.recaps then PM.pendingRecap=nil; PM.HideRecap() end
+                refreshSettings(); PM.Refresh()
+            end)
+            settingsDialog.toggles[i].settingKey=key; settingsDialog.toggles[i].settingTitle=title
+        end
+        label(settingsDialog,"Hover reminders wait until you are out of combat.\nRecaps and notes in hover reminders start switched off.\nAll notes and tags stay private in your saved journal.",24,-355,512)
+        button(settingsDialog,"Manage custom tags",24,-421,248,function() guard(function() settingsDialog:Hide(); showTags() end) end)
+        button(settingsDialog,"Export backup",288,-421,248,function() guard(function() settingsDialog:Hide(); PM.ShowExport() end) end)
+        button(settingsDialog,"Reset window",24,-458,248,PM.ResetWindow)
+        button(settingsDialog,"Done",288,-510,248,function() settingsDialog:Hide() end)
+    end
+    refreshSettings(); settingsDialog:Show()
+end
+refreshSettings=function()
+    if not settingsDialog then return end
+    for _,b in ipairs(settingsDialog.toggles) do
+        local enabled=PM.db[b.settingKey]
+        if b.settingKey=="minimap" then enabled=not PM.db.minimap.hidden end
+        b:SetText(b.settingTitle..": "..(enabled and "on" or "off"))
+    end
 end
 local function exportPageRefresh()
     local pages=#exportParts; exportPage=math.max(1,math.min(pages,exportPage))
@@ -196,7 +287,7 @@ local adventureColumns = {{"Date","started",0},{"Activity","kind",0.22},{"Advent
 local companionColumns = {{"Companion","name",0},{"Class","class",0.32},{"Together","encounters",0.46},{"Last adventure","adventure",0.59},{"Last seen","lastSeen",0.83}}
 local function columns() return view=="Adventures" and adventureColumns or companionColumns end
 local function duration(session)
-    local minutes = math.floor(math.max(0,(session.ended or session.lastSeen)-session.started)/60)
+    local minutes = math.floor(PM.Duration(session)/60)
     return minutes < 60 and (minutes.."m") or (math.floor(minutes/60).."h "..(minutes%60).."m")
 end
 local function selectSession(session)
@@ -211,6 +302,78 @@ local function selectPerson(person)
         selectedPerson=person; selectedSession=nil; linkPage=1
         note:SetText(person.note or ""); nickname:SetText(person.nickname or ""); PM.Refresh()
     end)
+end
+function PM.HideRecap()
+    if recapDialog then recapDialog:Hide() end
+    recapSession=nil
+end
+function PM.QueueRecap(session)
+    PM.pendingRecap=session; PM.recapQueuedAt=time()
+end
+local function openRecapEntry(person)
+    local session=recapSession
+    if not window then PM.Toggle() elseif not window:IsShown() then window:Show() end
+    guard(function()
+        if person and PM.db.people[person.name]==person then selectPerson(person)
+        elseif session and PM.HasAdventure(session) then selectSession(session) end
+        PM.HideRecap(); note:SetFocus()
+    end)
+end
+refreshRecap=function()
+    if not recapDialog or not recapSession or not PM.HasAdventure(recapSession) then PM.HideRecap(); return end
+    local session=recapSession
+    recapPage=math.max(1,math.min(recapPage,math.ceil(#session.members/4)))
+    recapDialog.summary:SetText(session.zone.." | "..duration(session).." recorded\n"..#session.members.." companions - keep a little memory for next time.")
+    recapDialog.pages:SetText("Companions "..recapPage.." / "..math.max(1,math.ceil(#session.members/4)))
+    for i,row in ipairs(recapDialog.rows) do
+        local member=session.members[(recapPage-1)*4+i]
+        local person=member and PM.db.people[member.name]
+        if person then
+            row.name:SetText(colourName(person)); row.name:Show()
+            row.favourite:SetText(person.favourite and "Unfavourite" or "Favourite"); row.favourite:Show(); row.note:Show()
+            row.favourite:SetScript("OnClick",function() person.favourite=not person.favourite; refreshRecap(); PM.Refresh() end)
+            row.note:SetScript("OnClick",function() openRecapEntry(person) end)
+        else row.name:Hide(); row.favourite:Hide(); row.note:Hide() end
+    end
+end
+function PM.MaybeShowRecap()
+    if recapSession and not PM.HasAdventure(recapSession) then PM.HideRecap() end
+    if not PM.db or not PM.db.recaps then PM.pendingRecap=nil; PM.HideRecap(); return end
+    if PM.loadingWorld or (InCombatLockdown and InCombatLockdown()) then
+        if recapDialog and recapDialog:IsShown() then
+            PM.pendingRecap=recapSession; PM.recapQueuedAt=time(); PM.HideRecap()
+        end
+        return
+    end
+    if not PM.pendingRecap or (recapDialog and recapDialog:IsShown()) then return end
+    if time()-(PM.recapQueuedAt or time())>600 or not PM.HasAdventure(PM.pendingRecap) then PM.pendingRecap=nil; return end
+    if PM.currentParty and next(PM.currentParty) then return end
+    if pendingNavigation or (settingsDialog and settingsDialog:IsShown()) or (tagDialog and tagDialog:IsShown()) or (exportDialog and exportDialog:IsShown()) then return end
+    if not recapDialog then
+        recapDialog=CreateFrame("Frame","FamiliarFacesRecap",UIParent); recapDialog:SetSize(560,410); recapDialog:SetPoint("CENTER")
+        recapDialog:SetFrameStrata("FULLSCREEN_DIALOG"); recapDialog:EnableMouse(true); recapDialog:SetClampedToScreen(true)
+        fill(recapDialog,0.025,0.065,0.085); border(recapDialog); table.insert(UISpecialFrames,"FamiliarFacesRecap")
+        label(recapDialog,"Another adventure remembered.",22,-22,516,"GameFontNormalLarge")
+        recapDialog.summary=label(recapDialog,"",22,-57,516); recapDialog.summary:SetHeight(40)
+        label(recapDialog,"FAMILIAR FACES  /  GOOD COMPANY",22,-103,516,"GameFontNormal")
+        recapDialog.rows={}
+        for i=1,4 do
+            local y=-140-(i-1)*39
+            recapDialog.rows[i]={name=label(recapDialog,"",22,y-7,300),
+                favourite=button(recapDialog,"Favourite",328,y,112,function() end),
+                note=button(recapDialog,"Add note",448,y,90,function() end)}
+        end
+        button(recapDialog,"Previous",22,-303,100,function() recapPage=math.max(1,recapPage-1); refreshRecap() end)
+        recapDialog.pages=label(recapDialog,"",140,-311,280)
+        button(recapDialog,"Next",438,-303,100,function() recapPage=recapPage+1; refreshRecap() end)
+        button(recapDialog,"Add adventure note",22,-366,242,function() openRecapEntry() end)
+        button(recapDialog,"Keep adventuring",280,-366,258,PM.HideRecap)
+    end
+    recapSession=PM.pendingRecap; PM.pendingRecap=nil; recapPage=1
+    if recapDialog.SetScale and UIParent.GetWidth and UIParent.GetHeight then
+        recapDialog:SetScale(math.max(0.1,math.min(1,(UIParent:GetWidth()-40)/560,(UIParent:GetHeight()-40)/410)))
+    end
+    refreshRecap(); recapDialog:Show()
 end
 local function related()
     if selectedPerson then
@@ -289,10 +452,9 @@ function PM.Refresh()
     options.favouritesFirst=PM.db.favouritesFirst
     controls.daysButton:SetText("When: "..(options.days and ("Last "..options.days.." days") or "Any time"))
     controls.partyButton:SetText(options.currentParty and "In your party: on" or "In your party: off")
-    controls.minimapToggle:SetText("Minimap: "..(PM.db.minimap.hidden and "off" or "on"))
+    controls.characterButton:SetText("Character: "..(options.owner or "All"))
     controls.tagFilter:SetText("Tag: "..(options.tag or "All")); controls.pinnedFilter:SetText(options.pinned and "Pins: on" or "Pins: off")
-    controls.firstButton:SetText("Favourites first: "..(PM.db.favouritesFirst and "on" or "off"))
-    controls.noticesButton:SetText("Reunion notices: "..(PM.db.reunionNotices and "on" or "off"))
+    refreshSettings()
     local results=PM.Query(view,options)
     local count=visibleRows(); local pages=math.max(1,math.ceil(#results/count)); page=math.min(page,pages)
     for name,b in pairs(tabs) do
@@ -382,8 +544,12 @@ local function build()
         end)
     end)
     button(window,"Export backup",930,-122,150,PM.ShowExport)
-    controls.firstButton=button(window,"",310,-122,195,function() PM.db.favouritesFirst=not PM.db.favouritesFirst; page=1; PM.Refresh() end)
-    controls.noticesButton=button(window,"",515,-122,195,function() PM.db.reunionNotices=not PM.db.reunionNotices; PM.Refresh() end)
+    controls.characterButton=button(window,"Character: All",310,-122,195,function()
+        local names=PM.Characters(); local index=0
+        for i,name in ipairs(names) do if options.owner==name then index=i end end
+        options.owner=names[index+1]; page=1; PM.Refresh()
+    end)
+    button(window,"Settings",515,-122,198,PM.ShowSettings)
     local close=button(window,"Close",0,0,70,PM.Close)
     close:ClearAllPoints(); close:SetPoint("TOPRIGHT",-20,-20)
     for i,name in ipairs({"Adventures","Companions"}) do
@@ -415,15 +581,14 @@ local function build()
         options.notes=not options.notes; controls.notesButton:SetText(options.notes and "Notes: on" or "Notes: off"); page=1; PM.Refresh()
     end)
     button(window,"Clear filters",588,-202,125,function()
-        options.kind=nil; options.class=nil; options.favourites=false; options.notes=false; options.days=nil; options.currentParty=false; options.tag=nil; options.pinned=false; options.recentParty=false; page=1
+        options.kind=nil; options.class=nil; options.favourites=false; options.notes=false; options.days=nil; options.currentParty=false; options.tag=nil; options.pinned=false; options.recentParty=false; options.owner=nil; page=1
         controls.activityButton:SetText("Activity: All"); controls.classButton:SetText("Class: All"); controls.favouritesButton:SetText("Favourites: off"); controls.notesButton:SetText("Notes: off"); search:SetText(""); PM.Refresh()
     end)
     controls.daysButton=button(window,"",20,-238,145,function() options.days=options.days==nil and 7 or (options.days==7 and 30 or nil); page=1; PM.Refresh() end)
     controls.partyButton=button(window,"",172,-238,180,function() options.currentParty=not options.currentParty; page=1; PM.Refresh() end)
-    controls.minimapToggle=button(window,"",359,-238,110,function() PM.db.minimap.hidden=not PM.db.minimap.hidden; PM.InitMinimap(); PM.Refresh() end)
-    controls.tagFilter=button(window,"",476,-238,145,function()
-        local index=0; for i,tag in ipairs(PM.TagChoices) do if tag==options.tag then index=i end end
-        options.tag=PM.TagChoices[index+1]; page=1; PM.Refresh()
+    controls.tagFilter=button(window,"",359,-238,262,function()
+        local tags=PM.AllTags(); local index=0; for i,tag in ipairs(tags) do if tag==options.tag then index=i end end
+        options.tag=tags[index+1]; page=1; PM.Refresh()
     end)
     controls.pinnedFilter=button(window,"",628,-238,85,function() guard(function() view="Adventures"; options.pinned=not options.pinned; options.recentParty=false; page=1; PM.Refresh() end) end)
     for i=1,5 do headers[i]=button(window,"",0,-194,100,function()
@@ -509,6 +674,7 @@ local function build()
         if forgetDialog then forgetDialog:Hide() end; pendingForget=nil
         if tagDialog then tagDialog:Hide() end
         if exportDialog then exportDialog:Hide() end
+        if settingsDialog then settingsDialog:Hide() end
     end)
 end
 function PM.Toggle()
