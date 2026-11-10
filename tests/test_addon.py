@@ -42,8 +42,9 @@ function CreateFrame(kind,name,parent,template)
   SetWidth=function(self,w) self.width=w end, GetWidth=function(self) return self.width end,
   GetHeight=function(self) return self.height end, ClearAllPoints=noop,
   SetResizable=noop, SetResizeBounds=noop, StartSizing=noop,
-  SetMultiLine=noop, SetScrollChild=noop, SetScale=function(self,s) self.scale=s end, GetScale=function(self) return self.scale or 1 end,
-  SetHeight=noop, SetJustifyH=noop, SetJustifyV=noop, SetFontObject=noop,
+  SetMultiLine=function(self,value) self.multiline=value end, SetScrollChild=noop, SetScale=function(self,s) self.scale=s end, GetScale=function(self) return self.scale or 1 end,
+  SetHeight=function(self,h) self.height=h end, SetJustifyH=noop, SetJustifyV=noop, SetFontObject=noop, SetWordWrap=noop,
+  EnableMouseWheel=noop, SetVerticalScroll=function(self,v) self.scroll=v end, GetVerticalScroll=function(self) return self.scroll or 0 end,
   SetFrameStrata=noop, SetMovable=noop, EnableMouse=noop, RegisterForDrag=noop,
   StartMoving=noop, StopMovingOrSizing=noop, SetClampedToScreen=noop,
   SetHighlightTexture=noop, SetAutoFocus=noop, SetMaxLetters=noop,
@@ -73,7 +74,7 @@ class AddonTests(unittest.TestCase):
     def setUp(self):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.lua.execute(MOCKS)
-        for name in ('Store.lua', 'Core.lua', 'Tooltips.lua', 'UI.lua'):
+        for name in ('Store.lua', 'Backup.lua', 'Core.lua', 'Tooltips.lua', 'UI.lua'):
             self.lua.execute((ROOT / 'FamiliarFaces' / name).read_text(encoding='utf-8'))
         self.lua.execute("frames[1].scripts.OnEvent(frames[1], 'ADDON_LOADED', 'FamiliarFaces')")
 
@@ -109,7 +110,7 @@ class AddonTests(unittest.TestCase):
           for _,b in ipairs(buttons) do if b.entry==alice then b.scripts.OnClick(b); break end end
           clickText('Whisper'); assert(whispered=='Alice-OtherRealm')
           clickText('01 Jan  Elwynn Forest')
-          clickText('|cffffffffAlice-OtherRealm|r')
+          clickText('|cffffffffAlice-OtherRealm|r | Healer')
           clickText('Unfavourite'); assert(not alice.favourite)
           clickText('Clear filters')
           FamiliarFacesWindow:SetSize(1300,900); FamiliarFacesWindow.scripts.OnSizeChanged()
@@ -189,7 +190,7 @@ class AddonTests(unittest.TestCase):
           assert(FamiliarFaces.db.people['Alice-OtherRealm'].encounters==1)
           SlashCmdList.FAMILIARFACES('')
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
-          clickText('More players'); clickText('|cffc79c6ePlayer6-HomeRealm|r (left)')
+          clickText('More players'); clickText('More players'); clickText('|cffc79c6ePlayer6-HomeRealm|r | Unknown (left)')
           clickText('Whisper'); assert(whispered=='Player6-HomeRealm')
         ''')
 
@@ -200,13 +201,13 @@ class AddonTests(unittest.TestCase):
           assert(#FamiliarFaces.Search('OldPlayer')==1)
           SlashCmdList.FAMILIARFACES('')
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
-          clickText('OldPlayer')
+          clickText('OldPlayer | Unknown')
           FamiliarFaces.Capture(); assert(#FamiliarFaces.db.sessions==2)
         ''')
         # Rows carry a FontString in .text rather than a button label.
         self.lua.execute('''
           for _,b in ipairs(buttons) do if type(b.text)=='table' then b.scripts.OnClick(b); break end end
-          clickText('|cffffffffAlice-OtherRealm|r'); clickText('Favourite')
+          clickText('|cffffffffAlice-OtherRealm|r | Healer'); clickText('Favourite')
           for _,f in ipairs(frames) do if f.kind=='EditBox' then f:SetText('A great healer') end end
           clickText('Save note'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='A great healer')
           clickText('Whisper'); assert(whispered=='Alice-OtherRealm')
@@ -406,7 +407,8 @@ class AddonTests(unittest.TestCase):
           assert(FamiliarFacesWindow:GetHeight()*FamiliarFacesWindow:GetScale()<=660)
           local fields={}; for _,f in ipairs(frames) do if f.kind=='EditBox' then fields[#fields+1]=f end end
           fields[1].scripts.OnEnterPressed(fields[1]); fields[2]:SetText('Adventure keyboard note')
-          fields[2].scripts.OnEnterPressed(fields[2]); assert(FamiliarFaces.db.sessions[1].note=='Adventure keyboard note')
+          assert(fields[2].multiline and not fields[2].scripts.OnEnterPressed)
+          clickText('Save note'); assert(FamiliarFaces.db.sessions[1].note=='Adventure keyboard note')
           fields[2].scripts.OnTabPressed(fields[2]); fields[1].scripts.OnTabPressed(fields[1])
         ''')
 
@@ -575,6 +577,7 @@ class AddonTests(unittest.TestCase):
           assert(#FamiliarFaces.Query('Companions',{owner='Alt-HomeRealm',query='Alice'})==0)
           assert(#FamiliarFaces.Characters()==2)
           FamiliarFaces.Toggle(); clickText('Character: All')
+          clickText('Alt-HomeRealm')
           local shown=0; for _,b in ipairs(buttons) do if b.entry then shown=shown+1; assert(b.entry.owner=='Alt-HomeRealm') end end
           assert(shown==1); clickText('Clear filters')
           shown=0; for _,b in ipairs(buttons) do if b.entry then shown=shown+1 end end; assert(shown==2)
@@ -685,6 +688,191 @@ class AddonTests(unittest.TestCase):
           clickText('Add note'); clickText('Save')
           assert(FamiliarFaces.db.sessions[1].note=='Keep this adventure draft' and not FamiliarFacesRecap:IsShown())
           clickText('Helpful'); clickText('Save note'); assert(FamiliarFaces.db.people['Alice-OtherRealm'].note=='Helpful')
+        ''')
+
+    def test_import_roundtrip_legacy_and_multiline_unicode(self):
+        self.lua.execute(r'''
+          local PM=FamiliarFaces; PM.Capture(); roster={}; PM.Capture()
+          local p=PM.db.people['Alice-OtherRealm']; p.note='A "quote", a \\ slash\nCafé healer\twith patience'; p.nickname='Étoile'
+          PM.CreateTag('Evening runs'); p.tags={['Evening runs']=true}; p.favourite=true
+          PM.db.sessions[1].note='Line one\nLine two'; PM.db.sessions[1].pinned=true
+          for _,version in ipairs({5,6,7}) do
+            PM.db.version=version; local plan,err=PM.PreviewImport(PM.Export(),'replace'); assert(plan,err)
+            assert(plan.summary.added==1 and plan.summary.profiles==1)
+            assert(PM.ApplyImport(plan)); assert(PM.db.people[p.name].note==p.note)
+            assert(PM.db.people[p.name].nickname==p.nickname and PM.db.people[p.name].tags['Evening runs'])
+            assert(PM.db.sessions[1].pinned and PM.db.sessions[1].note=='Line one\nLine two')
+            assert(PM.LastRole(p.name)=='HEALER' and PM.db.people[p.name].encounters==1)
+          end
+        ''')
+
+    def test_import_rejects_code_partial_oversized_and_bad_shapes(self):
+        self.lua.execute(r'''
+          local PM=FamiliarFaces; PM.Capture(); local before=PM.Export()
+          local bad={before..' error("executed")',before:sub(1,-15),'FamiliarFacesDB=os.execute("anything")',
+            'FamiliarFacesDB={ ["people"]={}, ["people"]={}, ["sessions"]={}, ["version"]=7}',
+            'FamiliarFacesDB={ ["people"]={}, ["sessions"]={[2]={}}, ["version"]=7}',
+            string.rep('x',2*1024*1024+1)}
+          for _,text in ipairs(bad) do local plan,err=PM.PreviewImport(text,'merge'); assert(not plan and type(err)=='string'); assert(PM.Export()==before) end
+          local original=PM.db.sessions[1].lastSeen; PM.db.sessions[1].lastSeen=-1
+          assert(not PM.PreviewImport(PM.Export(),'merge')); PM.db.sessions[1].lastSeen=original
+          PM.db.version=99; assert(not PM.PreviewImport(PM.Export(),'merge'))
+        ''')
+
+    def test_import_merge_conflicts_dedup_and_repeated_import(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); roster={}; PM.Capture()
+          local p=PM.db.people['Alice-OtherRealm']; p.note='Imported note'; p.nickname='Imported name'; p.favourite=true
+          PM.db.sessions[1].note='Imported adventure'; PM.db.sessions[1].pinned=true
+          PM.CreateTag('Evenings'); p.tags={Evenings=true}; local backup=PM.Export()
+          p.note='My note'; p.nickname='My name'; p.favourite=false; p.tags={}
+          PM.db.sessions[1].id=42; PM.db.sessions[1].note='My adventure'; PM.db.sessions[1].pinned=false
+          local plan,err=PM.PreviewImport(backup,'merge'); assert(plan,err)
+          assert(plan.summary.added==0 and plan.summary.duplicates==1 and plan.summary.conflicts==3)
+          assert(not p.favourite and PM.db.sessions[1].id==42)
+          assert(PM.ApplyImport(plan)); p=PM.db.people[p.name]
+          assert(p.note=='My note' and p.nickname=='My name' and p.favourite and p.tags.Evenings)
+          assert(#PM.db.sessions==1 and PM.db.sessions[1].id==42 and PM.db.sessions[1].pinned)
+          plan=assert(PM.PreviewImport(backup,'merge')); assert(PM.ApplyImport(plan)); assert(#PM.db.sessions==1)
+        ''')
+
+    def test_import_remaps_ids_preserves_settings_and_replace(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); roster={}; PM.Capture(); local backup=PM.Export()
+          FamiliarFacesDB=PM.Init({enabled=false,recaps=true,rememberView=false,minimap={hidden=true,angle=90}})
+          PM.db.enabled=true
+          PM.Record('Alt',{{name='Bram',role='TANK'}},{kind='Dungeon',zone='Other'},2000); PM.EndSession(2010)
+          PM.db.enabled=false
+          local plan,err=PM.PreviewImport(backup,'merge'); assert(plan,err); assert(PM.ApplyImport(plan))
+          assert(#PM.db.sessions==2 and PM.db.sessions[1].id~=PM.db.sessions[2].id)
+          assert(not PM.db.enabled and PM.db.recaps and not PM.db.rememberView and PM.db.minimap.hidden)
+          plan=assert(PM.PreviewImport(backup,'replace')); assert(PM.ApplyImport(plan))
+          assert(#PM.db.sessions==1 and not PM.db.people.Bram and PM.db.people['Alice-OtherRealm'])
+          assert(not PM.db.enabled and PM.db.recaps and not PM.db.rememberView)
+        ''')
+
+    def test_import_blocked_in_party_raid_combat_or_after_changes(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); local backup=PM.Export()
+          local plan=assert(PM.PreviewImport(backup,'merge')); assert(not PM.ApplyImport(plan))
+          roster={}; PM.Capture(); plan=assert(PM.PreviewImport(backup,'merge'))
+          combat=true; assert(not PM.ApplyImport(plan)); combat=false
+          raid=true; assert(not PM.ApplyImport(plan)); raid=false
+          PM.db.people['Alice-OtherRealm'].note='Changed since preview'; assert(not PM.ApplyImport(plan))
+          plan=assert(PM.PreviewImport(backup,'merge')); assert(PM.ApplyImport(plan))
+        ''')
+
+    def test_import_custom_tag_limit_case_mapping_and_unknown_tag(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); roster={}; PM.Capture()
+          PM.CreateTag('Friends'); PM.db.people['Alice-OtherRealm'].tags={Friends=true}; local backup=PM.Export()
+          PM.RenameTag('Friends','FRIENDS')
+          local plan=assert(PM.PreviewImport(backup,'merge')); assert(#plan.data.customTags==1 and plan.data.people['Alice-OtherRealm'].tags.FRIENDS)
+          for i=1,19 do PM.CreateTag('Tag '..i) end
+          PM.RenameTag('FRIENDS','Different'); assert(not PM.PreviewImport(backup,'merge'))
+          PM.db.people['Alice-OtherRealm'].tags={Unknown=true}; assert(not PM.PreviewImport(PM.Export(),'replace'))
+        ''')
+
+    def test_import_ui_parts_preview_confirmation_and_cancel(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); roster={}; PM.Capture(); local backup=PM.Export()
+          SlashCmdList.FAMILIARFACES('import'); assert(FamiliarFacesImport:IsShown())
+          FamiliarFacesImportText:SetText(backup:sub(1,120)); clickText('Add pasted part')
+          FamiliarFacesImportText:SetText(backup:sub(121)); clickText('Preview import')
+          assert(FamiliarFacesImport.plan and FamiliarFacesImport.plan.summary.duplicates==1)
+          local old=PM.db; clickText('Apply import'); assert(PM.db==old)
+          clickText('Confirm merge'); assert(PM.db~=old and #PM.db.sessions==1 and not FamiliarFacesImport:IsShown())
+          SlashCmdList.FAMILIARFACES('import'); FamiliarFacesImportText:SetText(backup)
+          clickText('Mode: Merge'); clickText('Preview import'); clickText('Apply import')
+          assert(FamiliarFacesImport.confirm and FamiliarFacesImport.mode=='replace')
+          FamiliarFacesImportText:SetText('bad'); assert(not FamiliarFacesImport.plan and not FamiliarFacesImport.confirm)
+          FamiliarFacesImport:Hide(); assert(FamiliarFacesImportText:GetText()=='')
+        ''')
+
+    def test_dropdown_selection_and_menu_pagination(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); PM.Toggle()
+          clickText('Activity: All'); clickText('Dungeon'); assert(PM.db.viewState.options.kind=='Dungeon')
+          clickText('Clear filters'); clickText('Role: All'); clickText('Healer'); assert(PM.db.viewState.options.role=='HEALER')
+          clickText('When: Any time'); clickText('Last 30 days'); assert(PM.db.viewState.options.days==30)
+          clickText('Class: All'); clickText('PRIEST'); assert(PM.db.viewState.options.class=='PRIEST')
+          for i=1,12 do PM.CreateTag('Tag '..i) end
+          clickText('Tag: All'); local menu=FamiliarFacesFilterMenu; menu.scripts.OnMouseWheel(menu,-1)
+          assert(menu.page==2); clickText('Tag 12'); assert(PM.db.viewState.options.tag=='Tag 12' and not menu:IsShown())
+          clickText('Clear filters'); assert(not PM.db.viewState.options.role and not PM.db.viewState.options.tag)
+        ''')
+
+    def test_remember_view_reload_reset_opt_out_and_stale_filters(self):
+        self.lua.execute('''
+          FamiliarFaces.Capture(); FamiliarFaces.Toggle(); clickText('Companions'); clickText('Role: All'); clickText('Healer')
+          clickText('Favourites: off')
+          for _,f in ipairs(frames) do if f.kind=='EditBox' then f:SetText('Alice'); break end end
+          clickText('Companion'); assert(FamiliarFaces.db.viewState.options.sort=='name')
+        ''')
+        self.reload_addon()
+        self.lua.execute('''
+          FamiliarFaces.Toggle(); local saved=FamiliarFaces.db.viewState
+          assert(saved.view=='Companions' and saved.options.role=='HEALER' and saved.options.favourites and saved.options.query=='Alice' and saved.options.sort=='name')
+          SlashCmdList.FAMILIARFACES('reset view'); assert(FamiliarFaces.db.viewState.view=='Adventures' and FamiliarFaces.db.viewState.options.query=='')
+          SlashCmdList.FAMILIARFACES('settings'); clickText('Remember my view: on'); assert(not FamiliarFaces.db.viewState)
+          local view,opts=FamiliarFaces.CleanView({view='garbage',options={class='NOPE',role='DPS',tag='Deleted',owner='Deleted',sort='bad'}})
+          assert(view=='Adventures' and not opts.class and not opts.role and not opts.tag and not opts.owner and opts.sort=='started')
+          local _,utf=FamiliarFaces.CleanView({options={query=string.rep('é',101)}})
+          assert(utf.query==string.rep('é',100))
+        ''')
+        self.reload_addon()
+        self.lua.execute("FamiliarFaces.Toggle(); assert(not FamiliarFaces.db.rememberView and not FamiliarFaces.db.viewState)")
+
+    def test_multiline_note_save_counter_guard_and_wheel(self):
+        self.lua.execute(r'''
+          FamiliarFaces.Capture(); FamiliarFaces.Toggle()
+          for _,b in ipairs(buttons) do if b.entry then b.scripts.OnClick(b); break end end
+          local note=FamiliarFacesNote; assert(note.multiline and not note.scripts.OnEnterPressed)
+          note:SetText('Café\nPatient healer'); assert(FamiliarFaces.TextLength(note:GetText())==19)
+          clickText('Close'); assert(FamiliarFacesDraftDialog:IsShown()); clickText('Save')
+          assert(FamiliarFaces.db.sessions[1].note=='Café\nPatient healer')
+          FamiliarFaces.Toggle(); note:SetText(string.rep('line\n',30)); note.scripts.OnMouseWheel(note,-1)
+          clickText('Save note'); assert(FamiliarFaces.db.sessions[1].note==string.rep('line\n',30))
+        ''')
+
+    def test_list_mousewheel_clamps_and_browses(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces
+          for i=1,35 do PM.Record('Me',{{name='Person'..i}},{kind='Questing',zone='Zone '..i},1000+i); PM.EndSession(1000+i) end
+          PM.Toggle(); local row
+          for _,b in ipairs(buttons) do if b.entry then row=b; break end end
+          assert(row.entry.started==1035)
+          row.scripts.OnMouseWheel(row,-1); assert(row.entry.started==1019)
+          row.scripts.OnMouseWheel(row,-1); assert(row.entry.started==1003)
+          row.scripts.OnMouseWheel(row,-1); assert(row.entry.started==1003)
+          row.scripts.OnMouseWheel(row,1); row.scripts.OnMouseWheel(row,1); row.scripts.OnMouseWheel(row,1); assert(row.entry.started==1035)
+        ''')
+
+    def test_roles_latest_unknown_and_historical_adventure_filters(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces; PM.Capture(); PM.EndSession(clock)
+          clock=1100; roster[1].role='DAMAGER'; PM.Capture(); PM.EndSession(clock)
+          assert(PM.LastRole('Alice-OtherRealm')=='DAMAGER')
+          assert(#PM.Query('Companions',{role='HEALER'})==0 and #PM.Query('Companions',{role='DAMAGER'})==1)
+          assert(#PM.Query('Adventures',{role='HEALER'})==1 and #PM.Query('Adventures',{role='DAMAGER'})==1)
+          clock=1200; UnitGroupRolesAssigned=nil; PM.Capture()
+          assert(PM.LastRole('Alice-OtherRealm')=='NONE' and #PM.Query('Companions',{role='NONE'})==1)
+          PM.ForgetAdventure(PM.active); assert(PM.LastRole('Alice-OtherRealm')=='DAMAGER')
+        ''')
+
+    def test_large_journal_index_reuse_and_mutation(self):
+        self.lua.execute('''
+          local PM=FamiliarFaces
+          -- Build a saved journal directly so this test measures lookups rather than live capture.
+          for i=1,3000 do
+            local s={id=i,owner='Me',kind='Dungeon',zone='Dungeon '..i,started=i,lastSeen=i+10,members={},locations={}}
+            for j=1,4 do local name='Person'..((i+j)%500); s.members[j]={name=name,class='PRIEST',role='HEALER'}; PM.db.people[name]={name=name} end
+            PM.db.sessions[i]=s
+          end
+          PM.RebuildPeople(); local index=PM.HistoryIndex(); assert(#PM.Query('Companions',{sort='adventure'})==500)
+          assert(PM.HistoryIndex()==index and #PM.Query('Adventures',{query='Dungeon',role='HEALER'})==3000)
+          for _,p in pairs(PM.db.people) do assert(p.encounters==24 and PM.LastAdventure(p.name) and PM.FirstAdventure(p.name)) end
+          PM.ForgetAdventure(PM.db.sessions[1]); assert(PM.HistoryIndex()~=index and #PM.Query('Adventures',{})==2999)
         ''')
 
 if __name__ == '__main__':

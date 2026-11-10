@@ -6,14 +6,15 @@ The healer who saved the run. The tank who explained the boss. The questing comp
 
 Good company deserves more than a name you almost remember. **Familiar Faces** keeps a personal journal of your dungeon and questing parties, helping you recognise familiar players and find them again.
 
-## New in 0.7.0: Good Company
+## New in 0.8.0: Little Comforts
 
-- **We've met before:** optional player hover reminders show how many recorded adventures you have shared, your last meeting and favourite status. Include your private note if you choose.
-- **Another adventure remembered:** an optional recap after your party ends lets you favourite companions or jump straight into writing a companion or adventure note.
-- **Pick up where you left off:** recover a recent adventure after a UI reload or brief reconnect when your character and full party roster still match.
-- **Your words, your memories:** create your own companion tags, alongside Helpful guide, Quest buddy and Run again.
-- **A journal for every character:** filter adventures and companions by the character you played.
-- **Make yourself at home:** a dedicated Settings panel puts your preferences in one place.
+- **Choose, then adventure:** activity, class, character, date, tag and role filters now open selectable menus.
+- **Right where you left it:** remember your tab, search, filters and sort between logins, with a Reset view shortcut.
+- **Room for the story:** multiline companion and adventure notes hold up to 1,000 characters, with a live counter and scrolling.
+- **Remember their role:** see and filter Tank, Healer, Damage or Unknown, using roles actually reported by the game.
+- **Browse with a scroll:** use the mouse wheel over journal rows, shared-history buttons and longer filter menus.
+- **A smoother growing journal:** shared history indexing and cached sort values reduce repeated work in large collections.
+- **Bring your memories along:** preview a text backup, then merge it into your journal or explicitly replace the journal.
 
 ## Every party has a story
 
@@ -27,14 +28,14 @@ In the **Adventures** tab you can:
 - Select an adventure to see everyone who joined and the places you visited together.
 - Write a private adventure note and find it again through search.
 - Pin memorable adventures above other entries, or show only pinned adventures.
-- Filter by your character, activity, class, favourites, notes, tags, current party or the last 7 or 30 days.
+- Filter by your character, activity, class, recorded role, favourites, notes, tags, current party or the last 7 or 30 days.
 - Sort using column headings and clear filters whenever you want the full picture.
 
 ## Good company is worth remembering
 
 The **Companions** tab brings your remembered players together in one searchable list, with class-coloured names, shared-adventure counts, last adventures and last-seen dates.
 
-- Save a personal note or a private nickname, such as Westfall quest buddy.
+- Save a multiline personal note of up to 1,000 characters or a private nickname, such as Westfall quest buddy. Adventure notes have the same room.
 - Use Helpful, Patient and Great company prompts to start a note, then save it.
 - Mark favourite companions and optionally keep them at the top of your list.
 - View the first and latest adventures you have kept with a player and browse your shared history.
@@ -43,7 +44,9 @@ The **Companions** tab brings your remembered players together in one searchable
 - Search names, realms, locations, your characters, notes, nicknames and tags.
 - Open a whisper or invite a selected companion through the game's normal social functions.
 
-The **Character** button cycles through your recorded characters and All. It filters which adventures and companions appear; companion profiles, counts, notes, nicknames, favourites and tags remain shared across the journal.
+The **Character** menu lets you choose a recorded character or All. It filters which adventures and companions appear; companion profiles, counts, notes, nicknames, favourites and tags remain shared across the journal.
+
+The **Role** menu filters Tank, Healer, Damage or Unknown. Adventure filters use the role recorded in each adventure; companion filters and profiles use the latest recorded role across your journal. Roles are historical reminders, not a current specialisation check. If the client does not supply a role, it stays Unknown; Familiar Faces never guesses from class.
 
 ## Remember them in your own words
 
@@ -83,10 +86,13 @@ Open **Settings** or type `/ff settings` to control:
 - Player hover reminders and whether they include private notes.
 - End-of-adventure recaps.
 - The optional minimap button, which you can drag around the minimap.
+- Remember my view: save your tab, search, filters and sorting between logins. This starts on.
 
-Settings also provides custom-tag management, a backup shortcut and a window reset. Hover reminders start on; private notes in hover reminders and recaps start off. Existing preferences are preserved when updating.
+Settings also provides custom-tag management, backup export and import, a window reset and **Reset view**. Reset view opens Adventures and clears search and filters without changing your journal. Hover reminders start on; private notes in hover reminders and recaps start off. Existing preferences are preserved when updating.
 
-Notes and nickname drafts offer **Save, Discard or Cancel** when you switch entries or close the journal. Incoming party updates keep your draft intact. Tab moves between search and detail fields; Enter opens the first search result or saves your detail edits.
+Notes and nickname drafts offer **Save, Discard or Cancel** when you switch entries or close the journal. Incoming party updates keep your draft intact. Tab moves between search and detail fields. Enter opens the first search result, adds a new line in notes, or saves nickname edits. Use **Save note** to save a multiline note.
+
+Scroll the mouse wheel over the journal list to change pages, over shared-history buttons to browse more companions or adventures, or inside a note to scroll its text. Longer filter menus also support the wheel.
 
 ## Keep the memories you want
 
@@ -99,7 +105,15 @@ Notes and nickname drafts offer **Save, Discard or Cancel** when you switch entr
 
 Choose **Export backup** or type `/ff export` to copy a text archive of your complete saved journal and settings, including adventures, members, locations, notes, nicknames, tags, pins and preferences.
 
-Large exports are split into numbered parts. Copy every part into one text file in order, without inserting separators or extra characters. Exports contain private player names and notes, so keep them private. This is a saved-data archive for safekeeping; automatic import is not included.
+Large exports are split into numbered parts. Copy every part into one text file in order, without inserting separators or extra characters. Exports contain private player names and notes, so keep them private.
+
+Open **Import backup** from Settings or type `/ff import`. Paste your archive, or paste each part in order and click **Add pasted part**. Choose **Preview import** to see adventure, duplicate, new-profile and text-conflict counts before applying anything.
+
+- **Merge** keeps your existing journal, adds imported adventures and skips exact duplicate records even if their IDs differ. Existing non-empty notes and nicknames win conflicts; blank fields can be filled, and favourites, pins and tags are combined. Different snapshots of a continuing adventure may remain separate.
+- **Replace journal** replaces your current history, profiles, notes, favourites, pins and custom tags. It requires a separate confirmation. Export first if you want to keep a copy.
+- Both modes keep your current settings. Pasted text is parsed as data and is never executed as Lua code.
+- Import while solo and outside combat. If your journal changes after previewing, preview it again. Missing parts or invalid backups are rejected without changing your journal.
+- Imports accept Familiar Faces text exports up to 2 MB, 10,000 adventures and 25,000 profiles; the merged custom-tag total cannot exceed 20. Oversized or unsupported archives need to be managed through SavedVariables instead. There is no automatic account synchronisation.
 
 ## Commands
 
@@ -112,7 +126,9 @@ Large exports are split into numbered parts. Copy every part into one text file 
 | `/ff notices` | Toggle reunion chat notices. |
 | `/ff minimap` | Show or hide the minimap button. |
 | `/ff reset window` | Reset the journal's position and size. |
+| `/ff reset view` | Open Adventures and clear search and filters. |
 | `/ff export` | Open the copyable journal backup. |
+| `/ff import` | Preview and import a journal text backup. |
 | `/ff clear` | Show instructions for clearing saved data. |
 | `/ff clear confirm` | Erase all journal history, profiles and custom tags, retaining display and recording preferences. |
 

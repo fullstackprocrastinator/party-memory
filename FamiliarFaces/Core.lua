@@ -94,11 +94,11 @@ SlashCmdList.FAMILIARFACES = function(input)
         PM.Capture()
     elseif input == "clear confirm" then
         local enabled,notices,first,minimap,placement=PM.db.enabled,PM.db.reunionNotices,PM.db.favouritesFirst,PM.db.minimap,PM.db.window
-        local tooltips,tooltipNotes,recaps=PM.db.tooltips,PM.db.tooltipNotes,PM.db.recaps
+        local tooltips,tooltipNotes,recaps,rememberView=PM.db.tooltips,PM.db.tooltipNotes,PM.db.recaps,PM.db.rememberView
         PM.EndSession(time())
         PM.pendingRecap=nil; if PM.HideRecap then PM.HideRecap() end
         FamiliarFacesDB = PM.Init({enabled = enabled,reunionNotices=notices,favouritesFirst=first,minimap=minimap,window=placement,
-            tooltips=tooltips,tooltipNotes=tooltipNotes,recaps=recaps})
+            tooltips=tooltips,tooltipNotes=tooltipNotes,recaps=recaps,rememberView=rememberView})
         if PM.Refresh then PM.Refresh() end
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: history, notes and favourites cleared.")
     elseif input == "clear" then
@@ -109,10 +109,14 @@ SlashCmdList.FAMILIARFACES = function(input)
         if PM.Refresh then PM.Refresh() end
     elseif input == "export" then
         if PM.ShowExport then PM.ShowExport() end
+    elseif input == "import" then
+        if PM.ShowImport then PM.ShowImport() end
     elseif input == "settings" then
         if PM.ShowSettings then PM.ShowSettings() end
     elseif input == "reset window" then
         PM.db.window=nil; if PM.ResetWindow then PM.ResetWindow() end
+    elseif input == "reset view" then
+        if PM.ResetView then PM.ResetView() end
     elseif input == "notices" then
         PM.db.reunionNotices=not PM.db.reunionNotices
         DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: reunion notices "..(PM.db.reunionNotices and "on." or "off."))

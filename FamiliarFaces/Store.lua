@@ -3,6 +3,49 @@ local PM = FamiliarFaces
 
 PM.TagChoices={"Helpful guide","Quest buddy","Run again"}
 PM.ResumeWindow=300
+PM.RoleNames={TANK="Tank",HEALER="Healer",DAMAGER="Damage",NONE="Unknown"}
+function PM.Role(role) return PM.RoleNames[role] and role or "NONE" end
+function PM.InvalidateHistory() PM.historyIndex=nil end
+function PM.HistoryIndex()
+    if PM.historyIndex then return PM.historyIndex end
+    local index={people={},sessions={},latest=nil}
+    for _,s in ipairs(PM.db.sessions) do
+        index.sessions[s]=true
+        if not index.latest or s.started>index.latest.started then index.latest=s end
+        local seen={}
+        for _,m in ipairs(s.members) do
+            local p=index.people[m.name]
+            if not p then p={adventures={},count=0}; index.people[m.name]=p end
+            if not seen[m.name] then p.count=p.count+1; p.adventures[#p.adventures+1]=s; seen[m.name]=true end
+            if not p.first or s.started<p.first.started then p.first=s end
+            if not p.last or s.lastSeen>p.last.lastSeen then p.last=s end
+            local at=m.lastSeen or s.lastSeen
+            if not p.roleAt or at>p.roleAt or (at==p.roleAt and s.started>(p.roleStarted or 0)) then
+                p.roleAt=at; p.roleStarted=s.started; p.role=PM.Role(m.role); p.class=m.class or p.class
+            end
+            p.firstSeen=math.min(p.firstSeen or s.started,m.joined or s.started)
+            p.lastSeen=math.max(p.lastSeen or 0,at)
+        end
+    end
+    PM.historyIndex=index; return index
+end
+function PM.LastRole(name)
+    local p=PM.HistoryIndex().people[name]; return p and p.role or "NONE"
+end
+function PM.SharedAdventures(name)
+    local p=PM.HistoryIndex().people[name]; return p and p.adventures or {}
+end
+function PM.TextLength(text)
+    local _,count=(text or ""):gsub("[^\128-\191]",""); return count
+end
+function PM.LimitText(text,limit)
+    local count=0
+    for i=1,#text do
+        local byte=text:byte(i)
+        if byte<128 or byte>=192 then count=count+1; if count>limit then return text:sub(1,i-1) end end
+    end
+    return text
+end
 
 function PM.AllTags()
     local tags={}
@@ -55,8 +98,7 @@ function PM.Characters()
     table.sort(names); return names
 end
 function PM.HasAdventure(target)
-    for _,s in ipairs(PM.db.sessions) do if s==target then return true end end
-    return false
+    return PM.HistoryIndex().sessions[target] or false
 end
 function PM.Duration(session)
     return math.max(0,(session.ended or session.lastSeen)-session.started-(session.awaySeconds or 0))
@@ -93,20 +135,10 @@ function PM.TryResume(owner,members,now)
     return false
 end
 function PM.FirstAdventure(name)
-    local first
-    for _,session in ipairs(PM.db.sessions) do
-        for _,member in ipairs(session.members) do
-            if member.name==name and (not first or session.started<first.started) then first=session end
-        end
-    end
-    return first
+    local p=PM.HistoryIndex().people[name]; return p and p.first
 end
 function PM.RecentAdventure()
-    local latest
-    for _,session in ipairs(PM.db.sessions) do
-        if not latest or session.started>latest.started then latest=session end
-    end
-    return latest
+    return PM.HistoryIndex().latest
 end
 function PM.HasTag(person,tag)
     return not tag or (person.tags and person.tags[tag])
@@ -143,31 +175,25 @@ function PM.ExportParts(text)
 end
 
 function PM.LastAdventure(name, exclude)
+    local p=PM.HistoryIndex().people[name]
+    if not p then return end
+    if p.last~=exclude then return p.last end
     local latest
-    for _,session in ipairs(PM.db.sessions) do
+    for _,session in ipairs(p.adventures) do
         if session ~= exclude then
-            for _,member in ipairs(session.members) do
-                if member.name == name and (not latest or session.lastSeen > latest.lastSeen) then latest=session end
-            end
+            if not latest or session.lastSeen > latest.lastSeen then latest=session end
         end
     end
     return latest
 end
 
 function PM.RebuildPeople()
+    PM.InvalidateHistory()
+    local index=PM.HistoryIndex()
     for name,person in pairs(PM.db.people) do
-        local count,first,last,class=0,nil,nil,person.class
-        for _,session in ipairs(PM.db.sessions) do
-            for _,member in ipairs(session.members) do
-                if member.name==name then
-                    count=count+1
-                    first=math.min(first or session.started,member.joined or session.started)
-                    last=math.max(last or 0,member.lastSeen or session.lastSeen)
-                    class=member.class or class
-                end
-            end
-        end
-        person.encounters=count; person.firstSeen=first; person.lastSeen=last; person.class=class
+        local p=index.people[name]
+        person.encounters=p and p.count or 0; person.firstSeen=p and p.firstSeen; person.lastSeen=p and p.lastSeen
+        person.class=(p and p.class) or person.class
     end
 end
 
@@ -206,7 +232,7 @@ end
 
 function PM.Init(db)
     db = db or {}
-    db.version = 6
+    db.version = 7
     db.sessions = db.sessions or {}
     db.people = db.people or {}
     db.nextID = db.nextID or 1
@@ -218,9 +244,11 @@ function PM.Init(db)
     db.tooltips = db.tooltips ~= false
     db.tooltipNotes = db.tooltipNotes == true
     db.recaps = db.recaps == true
+    db.rememberView = db.rememberView ~= false
     PM.active=nil; PM.notified=nil; PM.ignored=nil; PM.suppressParty=nil; PM.currentParty={}
     PM.pendingResume=db.continuity
     PM.db = db
+    PM.InvalidateHistory()
     return db
 end
 
@@ -297,6 +325,7 @@ function PM.Record(owner, members, context, now)
         if not current[member.name] and not member.left then member.left = now end
     end
     session.lastSeen = now
+    PM.InvalidateHistory()
     return session
 end
 
@@ -326,13 +355,23 @@ function PM.Query(view, options)
     local results, seen = {}, {}
     local latestParty=options.recentParty and PM.RecentAdventure()
     local query = string.lower(options.query or "")
+    local peopleText={}
+    local function personText(person)
+        local text=peopleText[person.name]
+        if not text then
+            text=string.lower(person.name.." "..(person.note or "").." "..(person.nickname or "").." "..PM.TagText(person))
+            peopleText[person.name]=text
+        end
+        return text
+    end
     for _, session in ipairs(PM.db.sessions) do
         local locationText = session.zone .. " " .. session.owner .. " " .. session.kind.." "..(session.note or "")
         for _, location in ipairs(session.locations or {}) do locationText = locationText .. " " .. location.zone end
+        local locationMatch=string.find(string.lower(locationText),query,1,true)~=nil
         local recent = (not options.days or session.lastSeen >= time()-options.days*86400)
             and (not options.recentParty or session==latestParty)
             and (not options.owner or session.owner==options.owner)
-        local matchingMember, matchesQuery = false, string.find(string.lower(locationText), query, 1, true) ~= nil
+        local matchingMember, matchesQuery = false, locationMatch
         for _, member in ipairs(session.members) do
             local person = PM.db.people[member.name] or {name = member.name, class = member.class}
             local eligible = (not options.class or (person.class or member.class) == options.class)
@@ -340,12 +379,13 @@ function PM.Query(view, options)
                 and (not options.notes or (person.note and person.note:match("%S")))
                 and (not options.currentParty or (PM.currentParty and PM.currentParty[member.name]))
                 and PM.HasTag(person,options.tag)
-            local personMatch = string.find(string.lower(member.name .. " " .. (person.note or "").." "..(person.nickname or "").." "..PM.TagText(person)), query, 1, true) ~= nil
+                and (not options.role or (view=="Adventures" and PM.Role(member.role) or PM.LastRole(member.name))==options.role)
+            local personMatch = string.find(personText(person), query, 1, true) ~= nil
             if eligible then
                 matchingMember = true
                 if personMatch then matchesQuery = true end
             end
-            if view == "Companions" and eligible and (personMatch or string.find(string.lower(locationText), query, 1, true))
+            if view == "Companions" and eligible and (personMatch or locationMatch)
                 and recent and (not options.kind or session.kind == options.kind) and not seen[member.name] then
                 seen[member.name] = true
                 results[#results + 1] = person
@@ -363,7 +403,8 @@ function PM.Query(view, options)
                 and (not options.notes or (person.note and person.note:match("%S")))
                 and (not options.currentParty or (PM.currentParty and PM.currentParty[name]))
                 and PM.HasTag(person,options.tag)
-                and string.find(string.lower(name.." "..(person.note or "").." "..(person.nickname or "").." "..PM.TagText(person)),query,1,true) then
+                and (not options.role or PM.LastRole(name)==options.role)
+                and string.find(personText(person),query,1,true) then
                 results[#results+1]=person
             end
         end
@@ -373,6 +414,7 @@ function PM.Query(view, options)
         if view == "Companions" then
             if key == "name" then return string.lower(item.name) end
             if key == "class" then return item.class or "" end
+            if key == "role" then return PM.RoleNames[PM.LastRole(item.name)] end
             if key == "encounters" then return item.encounters or 0 end
             if key == "note" then return string.lower(item.note or "") end
             if key == "favourite" then return item.favourite and 1 or 0 end
@@ -385,12 +427,30 @@ function PM.Query(view, options)
         if key == "duration" then return PM.Duration(item) end
         return item.started
     end
+    local values={}; for _,item in ipairs(results) do values[item]=value(item) end
     table.sort(results, function(a, b)
         if view=="Adventures" and not not a.pinned ~= not not b.pinned then return not not a.pinned end
         if view=="Companions" and options.favouritesFirst and not not a.favourite ~= not not b.favourite then return not not a.favourite end
-        local av, bv = value(a), value(b)
+        local av, bv = values[a], values[b]
         if av == bv then return tostring(a.id or a.name) < tostring(b.id or b.name) end
         if options.ascending then return av < bv else return av > bv end
     end)
     return results
+end
+
+function PM.CleanView(state)
+    state=type(state)=="table" and state or {}
+    local src=type(state.options)=="table" and state.options or {}; local result={}
+    local keys={name=true,class=true,role=true,encounters=true,note=true,favourite=true,adventure=true,lastSeen=true,kind=true,zone=true,members=true,duration=true,started=true}
+    local view=state.view=="Companions" and "Companions" or "Adventures"
+    result.sort=keys[src.sort] and src.sort or (view=="Companions" and "lastSeen" or "started")
+    for _,k in ipairs({"ascending","favourites","notes","currentParty","pinned","recentParty"}) do result[k]=src[k]==true end
+    result.query=type(src.query)=="string" and PM.LimitText(src.query,100) or ""
+    result.kind=(src.kind=="Dungeon" or src.kind=="Questing") and src.kind or nil
+    result.days=(src.days==7 or src.days==30) and src.days or nil
+    result.role=PM.RoleNames[src.role] and src.role or nil
+    for _,tag in ipairs(PM.AllTags()) do if src.tag==tag then result.tag=tag end end
+    for _,owner in ipairs(PM.Characters()) do if src.owner==owner then result.owner=owner end end
+    for _,p in pairs(PM.db.people) do if p.class and src.class==p.class then result.class=src.class; break end end
+    return view,result
 end

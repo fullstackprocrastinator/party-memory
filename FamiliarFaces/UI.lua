@@ -15,6 +15,8 @@ local tagDialog, exportDialog, exportField, exportPageLabel
 local exportText, exportPage, exportParts = "",1,{}
 local settingsDialog, recapDialog, recapSession, recapPage
 local refreshTags, refreshSettings, refreshRecap
+local filterMenu, importDialog, listScroll, restoringView
+local LINK_ROWS=3
 local function showCreator()
     if not creatorDialog then
         creatorDialog=CreateFrame("Frame",nil,window); creatorDialog:SetSize(620,140); creatorDialog:SetPoint("CENTER"); creatorDialog:EnableMouse(true)
@@ -70,9 +72,55 @@ local function button(parent,text,x,y,width,fn)
     b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
     b.SetText = function(self,t) self.textLabel:SetText(t); self.caption=t end
     b:SetText(text); b:SetScript("OnClick",fn)
+    b.menuX=x; b.menuY=y-28
     b:SetScript("OnEnter",function(self) if GameTooltip then GameTooltip:SetOwner(self,"ANCHOR_RIGHT"); GameTooltip:SetText(self.caption); GameTooltip:Show() end end)
     b:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     return b
+end
+local function wheel(frame,fn)
+    if frame.EnableMouseWheel then frame:EnableMouseWheel(true); frame:SetScript("OnMouseWheel",fn) end
+end
+local function menu(owner,title,choices,key)
+    if not filterMenu then
+        filterMenu=CreateFrame("Frame","FamiliarFacesFilterMenu",window); filterMenu:SetSize(320,326)
+        filterMenu:SetFrameStrata("FULLSCREEN_DIALOG"); filterMenu:EnableMouse(true)
+        table.insert(UISpecialFrames,"FamiliarFacesFilterMenu"); fill(filterMenu,0.025,0.065,0.085); border(filterMenu)
+        filterMenu.title=label(filterMenu,"",12,-13,296,"GameFontNormal"); filterMenu.rows={}
+        local function draw()
+            local pages=math.max(1,math.ceil(#filterMenu.choices/8)); filterMenu.page=math.max(1,math.min(pages,filterMenu.page))
+            local height=94+29*math.min(8,#filterMenu.choices); filterMenu:SetHeight(height)
+            for i,b in ipairs(filterMenu.paging or {}) do
+                b:ClearAllPoints(); b:SetPoint("TOPLEFT",12+(i-1)*102,-height+40)
+                if pages>1 or i==3 then b:Show() else b:Hide() end
+            end
+            filterMenu.title:SetText(filterMenu.heading.."  "..filterMenu.page.."/"..pages)
+            for i,b in ipairs(filterMenu.rows) do
+                local choice=filterMenu.choices[(filterMenu.page-1)*8+i]
+                if choice then
+                    b:SetText(choice.label); b:Show()
+                    b.bg:SetVertexColor(choice.value==options[filterMenu.key] and 0.3 or 0.075,0.22,0.15,1)
+                    b:SetScript("OnClick",function() options[filterMenu.key]=choice.value; page=1; filterMenu:Hide(); PM.Refresh() end)
+                else b:Hide() end
+            end
+        end
+        filterMenu.draw=draw
+        local function scroll(_,delta) filterMenu.page=filterMenu.page+(delta<0 and 1 or -1); draw() end
+        for i=1,8 do filterMenu.rows[i]=button(filterMenu,"",12,-42-(i-1)*29,296,function() end); wheel(filterMenu.rows[i],scroll) end
+        filterMenu.paging={button(filterMenu,"Previous",12,-286,92,function() scroll(nil,1) end),
+            button(filterMenu,"Next",114,-286,92,function() scroll(nil,-1) end),
+            button(filterMenu,"Close menu",216,-286,92,function() filterMenu:Hide() end)}
+        wheel(filterMenu,scroll)
+    end
+    filterMenu.heading=title; filterMenu.choices=choices; filterMenu.key=key; filterMenu.page=1
+    for i,c in ipairs(choices) do if c.value==options[key] then filterMenu.page=math.ceil(i/8) end end
+    filterMenu:ClearAllPoints(); filterMenu:SetPoint("TOPLEFT",math.min(owner.menuX,window:GetWidth()-340),owner.menuY)
+    filterMenu.draw(); filterMenu:Show()
+end
+local function saveView()
+    if restoringView or not PM.db then return end
+    if not PM.db.rememberView then PM.db.viewState=nil; return end
+    local saved={}; for k,v in pairs(options) do saved[k]=v end
+    PM.db.viewState={view=view,options=saved}
 end
 local function dirty()
     local target=selectedPerson or selectedSession
@@ -177,14 +225,14 @@ end
 function PM.ShowSettings()
     if not window then PM.Toggle() elseif not window:IsShown() then window:Show() end
     if not settingsDialog then
-        settingsDialog=CreateFrame("Frame","FamiliarFacesSettings",window); settingsDialog:SetSize(560,570); settingsDialog:SetPoint("CENTER")
+        settingsDialog=CreateFrame("Frame","FamiliarFacesSettings",window); settingsDialog:SetSize(560,620); settingsDialog:SetPoint("CENTER")
         settingsDialog:SetFrameStrata("FULLSCREEN_DIALOG"); settingsDialog:EnableMouse(true); table.insert(UISpecialFrames,"FamiliarFacesSettings")
         fill(settingsDialog,0.025,0.065,0.085); border(settingsDialog)
         label(settingsDialog,"Make yourself at home",24,-22,512,"GameFontNormalLarge")
-        label(settingsDialog,"Familiar Faces 0.7.0 - your journal, your preferences",24,-53,512)
+        label(settingsDialog,"Familiar Faces 0.8.0 - your journal, your preferences",24,-53,512)
         settingsDialog.toggles={}
         local choices={{"Recording","enabled"},{"Reunion notices","reunionNotices"},{"Favourites first","favouritesFirst"},
-            {"Player hover reminders","tooltips"},{"Private notes in hover reminders","tooltipNotes"},{"End-of-adventure recaps","recaps"},{"Minimap button","minimap"}}
+            {"Player hover reminders","tooltips"},{"Private notes in hover reminders","tooltipNotes"},{"End-of-adventure recaps","recaps"},{"Minimap button","minimap"},{"Remember my view","rememberView"}}
         for i,choice in ipairs(choices) do
             local title,key=choice[1],choice[2]
             settingsDialog.toggles[i]=button(settingsDialog,"",24,-85-(i-1)*37,512,function()
@@ -196,13 +244,22 @@ function PM.ShowSettings()
             end)
             settingsDialog.toggles[i].settingKey=key; settingsDialog.toggles[i].settingTitle=title
         end
-        label(settingsDialog,"Hover reminders wait until you are out of combat.\nRecaps and notes in hover reminders start switched off.\nAll notes and tags stay private in your saved journal.",24,-355,512)
-        button(settingsDialog,"Manage custom tags",24,-421,248,function() guard(function() settingsDialog:Hide(); showTags() end) end)
-        button(settingsDialog,"Export backup",288,-421,248,function() guard(function() settingsDialog:Hide(); PM.ShowExport() end) end)
-        button(settingsDialog,"Reset window",24,-458,248,PM.ResetWindow)
-        button(settingsDialog,"Done",288,-510,248,function() settingsDialog:Hide() end)
+        label(settingsDialog,"Your preferences stay on this account.\nRecaps and private hover notes start switched off.\nReset view clears filters and returns to Adventures.",24,-393,512)
+        button(settingsDialog,"Manage custom tags",24,-458,248,function() guard(function() settingsDialog:Hide(); showTags() end) end)
+        button(settingsDialog,"Export backup",288,-458,248,function() guard(function() settingsDialog:Hide(); PM.ShowExport() end) end)
+        button(settingsDialog,"Reset window",24,-495,248,PM.ResetWindow)
+        button(settingsDialog,"Import backup",288,-495,248,function() guard(function() settingsDialog:Hide(); PM.ShowImport() end) end)
+        button(settingsDialog,"Reset view",24,-568,248,function() PM.ResetView() end)
+        button(settingsDialog,"Done",288,-568,248,function() settingsDialog:Hide() end)
     end
     refreshSettings(); settingsDialog:Show()
+end
+function PM.ResetView()
+    if not window then PM.Toggle() elseif not window:IsShown() then window:Show() end
+    guard(function()
+        view="Adventures"; options={sort="started"}; page=1; selectedSession=nil; selectedPerson=nil
+        note:SetText(""); nickname:SetText(""); search:SetText(""); if filterMenu then filterMenu:Hide() end; PM.Refresh()
+    end)
 end
 refreshSettings=function()
     if not settingsDialog then return end
@@ -235,6 +292,69 @@ function PM.ShowExport()
             button(exportDialog,"Close backup",450,-404,230,function() exportDialog:Hide() end)
         end
         exportText=PM.Export(); exportParts=PM.ExportParts(exportText); exportPage=1; exportDialog:Show(); exportPageRefresh()
+    end)
+end
+function PM.ShowImport()
+    if not window then PM.Toggle() elseif not window:IsShown() then window:Show() end
+    guard(function()
+        if not importDialog then
+            importDialog=CreateFrame("Frame","FamiliarFacesImport",window); importDialog:SetSize(760,610); importDialog:SetPoint("CENTER")
+            importDialog:SetFrameStrata("FULLSCREEN_DIALOG"); importDialog:EnableMouse(true); table.insert(UISpecialFrames,"FamiliarFacesImport")
+            fill(importDialog,0.025,0.065,0.085); border(importDialog)
+            label(importDialog,"Bring your memories along",24,-22,712,"GameFontNormalLarge")
+            label(importDialog,"Paste a Familiar Faces text backup. For several parts, add each in order.\nOnly journal data is imported. Your settings stay as they are.",24,-58,712)
+            local scroll=CreateFrame("ScrollFrame",nil,importDialog,"UIPanelScrollFrameTemplate"); scroll:SetSize(680,200); scroll:SetPoint("TOPLEFT",24,-105); fill(scroll,0.02,0.055,0.07); border(scroll)
+            local field=CreateFrame("EditBox","FamiliarFacesImportText",scroll); field:SetSize(672,200); field:SetMultiLine(true); field:SetFontObject("GameFontHighlightSmall"); field:SetAutoFocus(false); field:SetMaxLetters(0); scroll:SetScrollChild(field); importDialog.field=field
+            field:SetScript("OnEscapePressed",field.ClearFocus)
+            importDialog.count=label(importDialog,"",24,-317,712)
+            importDialog.message=label(importDialog,"",24,-430,712); importDialog.message:SetHeight(107); importDialog.message:SetWordWrap(true)
+            local function invalidate()
+                importDialog.plan=nil; importDialog.confirm=false
+                if importDialog.apply then importDialog.apply:SetText("Apply import") end
+                importDialog.count:SetText((importDialog.parts or 0).." parts added | "..#(importDialog.buffer or "").." bytes stored | "..#field:GetText().." bytes pasted")
+                importDialog.message:SetText("Choose Preview import to check the backup before changing your journal.")
+            end
+            field:SetScript("OnTextChanged",function()
+                invalidate(); local _,lines=field:GetText():gsub("\n","")
+                field:SetHeight(math.max(200,(lines+1+math.ceil(#field:GetText()/90))*16))
+            end)
+            button(importDialog,"Add pasted part",24,-346,220,function()
+                if #importDialog.buffer+#field:GetText()>PM.ImportMaxBytes then importDialog.message:SetText("This backup exceeds the 2 MB import limit."); return end
+                if field:GetText()=="" then return end
+                importDialog.buffer=importDialog.buffer..field:GetText(); importDialog.parts=importDialog.parts+1; field:SetText(""); field:SetFocus()
+            end)
+            button(importDialog,"Clear pasted backup",254,-346,220,function() importDialog.buffer=""; importDialog.parts=0; field:SetText(""); invalidate() end)
+            button(importDialog,"Preview import",484,-346,252,function()
+                local plan,err=PM.PreviewImport(importDialog.buffer..field:GetText(),importDialog.mode)
+                importDialog.plan=plan; importDialog.confirm=false; importDialog.apply:SetText("Apply import"); field:ClearFocus()
+                if not plan then importDialog.message:SetText(err or "Could not read this backup."); return end
+                local s=plan.summary
+                importDialog.message:SetText((s.mode=="replace" and "REPLACE PREVIEW - current history, notes and favourites will be replaced.\n" or "MERGE PREVIEW - your existing journal will be kept.\n")..s.added.." adventures to add | "..s.duplicates.." duplicates skipped\n"..s.profiles.." companion profiles to add | "..s.conflicts.." text conflicts (existing text kept)\n"..s.total.." adventures after import. Import while solo, outside combat.")
+            end)
+            importDialog.modeButton=button(importDialog,"Mode: Merge",24,-388,220,function()
+                importDialog.mode=importDialog.mode=="merge" and "replace" or "merge"
+                importDialog.modeButton:SetText(importDialog.mode=="merge" and "Mode: Merge" or "Mode: Replace journal"); invalidate()
+            end)
+            label(importDialog,"Merge adds memories. Replace discards the current journal.",254,-396,482)
+            importDialog.apply=button(importDialog,"Apply import",24,-559,342,function()
+                if not importDialog.plan then importDialog.message:SetText("Preview a complete backup first."); return end
+                if not importDialog.confirm then
+                    importDialog.confirm=true
+                    importDialog.apply:SetText(importDialog.mode=="replace" and "Confirm replacement" or "Confirm merge")
+                    importDialog.message:SetText(importDialog.mode=="replace" and "Replace all current history, notes, tags and favourites?\nExport a backup first if you want to keep a copy.\nClick Confirm replacement to continue. Your settings are kept." or "Add the previewed memories to your journal?\nExisting text wins conflicts; favourites and tags are combined.\nClick Confirm merge to continue.")
+                    return
+                end
+                local ok,err=PM.ApplyImport(importDialog.plan)
+                if not ok then importDialog.message:SetText(err); importDialog.plan=nil; importDialog.confirm=false; importDialog.apply:SetText("Apply import"); return end
+                selectedPerson=nil; selectedSession=nil; note:SetText(""); nickname:SetText("")
+                view,options=PM.CleanView({view=view,options=options}); page=1; search:SetText(options.query or "")
+                importDialog:Hide(); PM.Refresh(); DEFAULT_CHAT_FRAME:AddMessage("Familiar Faces: your journal backup has been imported.")
+            end)
+            button(importDialog,"Cancel",384,-559,352,function() importDialog:Hide() end)
+            importDialog:SetScript("OnHide",function() field:ClearFocus(); importDialog.plan=nil; importDialog.buffer=""; importDialog.parts=0; field:SetText("") end)
+        end
+        importDialog.buffer=""; importDialog.parts=0; importDialog.mode="merge"; importDialog.modeButton:SetText("Mode: Merge")
+        importDialog.field:SetText(""); importDialog:Show(); importDialog.field:SetFocus()
     end)
 end
 function PM.SaveWindow()
@@ -294,6 +414,7 @@ local function selectSession(session)
     guard(function()
         selectedSession=session; selectedPerson=nil; linkPage=1; locationPage=1
         note:SetText(session.note or ""); nickname:SetText(""); PM.Refresh()
+        panel.noteScroll:SetVerticalScroll(0)
     end)
 end
 local function selectPerson(person)
@@ -301,6 +422,7 @@ local function selectPerson(person)
     guard(function()
         selectedPerson=person; selectedSession=nil; linkPage=1
         note:SetText(person.note or ""); nickname:SetText(person.nickname or ""); PM.Refresh()
+        panel.noteScroll:SetVerticalScroll(0)
     end)
 end
 function PM.HideRecap()
@@ -348,7 +470,7 @@ function PM.MaybeShowRecap()
     if not PM.pendingRecap or (recapDialog and recapDialog:IsShown()) then return end
     if time()-(PM.recapQueuedAt or time())>600 or not PM.HasAdventure(PM.pendingRecap) then PM.pendingRecap=nil; return end
     if PM.currentParty and next(PM.currentParty) then return end
-    if pendingNavigation or (settingsDialog and settingsDialog:IsShown()) or (tagDialog and tagDialog:IsShown()) or (exportDialog and exportDialog:IsShown()) then return end
+    if pendingNavigation or (settingsDialog and settingsDialog:IsShown()) or (tagDialog and tagDialog:IsShown()) or (exportDialog and exportDialog:IsShown()) or (importDialog and importDialog:IsShown()) then return end
     if not recapDialog then
         recapDialog=CreateFrame("Frame","FamiliarFacesRecap",UIParent); recapDialog:SetSize(560,410); recapDialog:SetPoint("CENTER")
         recapDialog:SetFrameStrata("FULLSCREEN_DIALOG"); recapDialog:EnableMouse(true); recapDialog:SetClampedToScreen(true)
@@ -377,11 +499,7 @@ function PM.MaybeShowRecap()
 end
 local function related()
     if selectedPerson then
-        local list={}
-        for _,s in ipairs(PM.db.sessions) do
-            for _,m in ipairs(s.members) do if m.name==selectedPerson.name then list[#list+1]=s; break end end
-        end
-        return list,"Shared adventures"
+        return PM.SharedAdventures(selectedPerson.name),"Shared adventures"
     end
     return selectedSession and selectedSession.members or {},"Companions"
 end
@@ -395,7 +513,7 @@ refreshDetails = function()
     if selectedPerson then
         heading:SetText(colourName(selectedPerson))
         local first,last=PM.FirstAdventure(selectedPerson.name),PM.LastAdventure(selectedPerson.name)
-        summary:SetText((selectedPerson.class or "Unknown class").." | "..(selectedPerson.encounters or 0).." recorded parties\nFirst: "..(first and first.zone or "No saved adventures").."\n"..(first and date("%d %b %Y",first.started) or "").."\nLatest: "..(last and last.zone or "No saved adventures").."\n"..(last and date("%d %b %Y",last.lastSeen) or ""))
+        summary:SetText((selectedPerson.class or "Unknown class").." | "..(selectedPerson.encounters or 0).." recorded parties\nLast recorded role: "..PM.RoleNames[PM.LastRole(selectedPerson.name)].."\nFirst: "..(first and first.zone or "No saved adventures").."\n"..(first and date("%d %b %Y",first.started) or "").."\nLatest: "..(last and last.zone or "No saved adventures").."\n"..(last and date("%d %b %Y",last.lastSeen) or ""))
     elseif selectedSession then
         heading:SetText(selectedSession.zone)
         summary:SetText(selectedSession.kind.." | "..(selectedSession.difficulty or "").."\n"..date("%d %b %Y %H:%M",selectedSession.started).." | "..duration(selectedSession).."\n"..selectedSession.owner)
@@ -406,7 +524,9 @@ refreshDetails = function()
     for i,b in ipairs(actions) do if selectedPerson or (selectedSession and i<=2) then b:Show() else b:Hide() end end
     if selectedPerson or selectedSession then controls.forgetButton:Show() else controls.forgetButton:Hide() end
     controls.forgetButton:SetText(selectedPerson and "Forget companion" or "Forget adventure")
-    if selectedPerson or selectedSession then note:Show(); panel.noteLabel:Show() else note:Hide(); panel.noteLabel:Hide() end
+    for _,item in ipairs({note,panel.noteScroll,panel.noteLabel,panel.noteCount}) do
+        if selectedPerson or selectedSession then item:Show() else item:Hide() end
+    end
     if selectedPerson then nickname:Show(); panel.nicknameLabel:Show() else nickname:Hide(); panel.nicknameLabel:Hide() end
     panel.noteLabel:SetText(dirty() and "Note - unsaved changes" or (selectedSession and "Adventure note" or "A little note for next time"))
     for _,b in ipairs({panel.previousLinks,panel.nextLinks}) do
@@ -419,18 +539,18 @@ refreshDetails = function()
     else panel.welcomeArt:Show(); panel.welcomeText:Show() end
     favourite:SetText(selectedPerson and (selectedPerson.favourite and "Unfavourite" or "Favourite") or (selectedSession and selectedSession.pinned and "Unpin adventure" or "Pin adventure"))
     local list,title=related()
-    local pages=math.max(1,math.ceil(#list/5)); linkPage=math.min(linkPage,pages)
+    local pages=math.max(1,math.ceil(#list/LINK_ROWS)); linkPage=math.min(linkPage,pages)
     panel.linkTitle:SetText((selectedSession or selectedPerson) and (title.." | "..linkPage.."/"..pages) or "")
     panel.previousLinks:SetText(selectedPerson and "Previous adventures" or "Previous players")
     panel.nextLinks:SetText(selectedPerson and "More adventures" or "More players")
     for i,b in ipairs(links) do
-        local entry=list[(linkPage-1)*5+i]
+        local entry=list[(linkPage-1)*LINK_ROWS+i]
         if entry then
             if selectedPerson then
                 b:SetText(date("%d %b",entry.started).."  "..entry.zone)
                 b:SetScript("OnClick",function() guard(function() view="Adventures"; options.sort="started"; page=1; selectSession(entry) end) end)
             else
-                b:SetText(colourName(entry)..(entry.left and " (left)" or ""))
+                b:SetText(colourName(entry).." | "..PM.RoleNames[PM.Role(entry.role)]..(entry.left and " (left)" or ""))
                 b:SetScript("OnClick",function() selectPerson(PM.db.people[entry.name] or entry) end)
             end
             b:Show()
@@ -450,11 +570,17 @@ function PM.Refresh()
     if not window or not window:IsShown() then return end
     options.query=search:GetText()
     options.favouritesFirst=PM.db.favouritesFirst
+    controls.activityButton:SetText("Activity: "..(options.kind or "All"))
+    controls.classButton:SetText("Class: "..(options.class or "All"))
+    controls.roleButton:SetText("Role: "..(PM.RoleNames[options.role] or "All"))
+    controls.favouritesButton:SetText(options.favourites and "Favourites: on" or "Favourites: off")
+    controls.notesButton:SetText(options.notes and "Notes: on" or "Notes: off")
     controls.daysButton:SetText("When: "..(options.days and ("Last "..options.days.." days") or "Any time"))
     controls.partyButton:SetText(options.currentParty and "In your party: on" or "In your party: off")
     controls.characterButton:SetText("Character: "..(options.owner or "All"))
     controls.tagFilter:SetText("Tag: "..(options.tag or "All")); controls.pinnedFilter:SetText(options.pinned and "Pins: on" or "Pins: off")
     refreshSettings()
+    saveView()
     local results=PM.Query(view,options)
     local count=visibleRows(); local pages=math.max(1,math.ceil(#results/count)); page=math.min(page,pages)
     for name,b in pairs(tabs) do
@@ -490,6 +616,7 @@ function PM.Refresh()
                 GameTooltip:SetOwner(row,"ANCHOR_RIGHT")
                 if view=="Companions" then
                     GameTooltip:SetText(item.name); GameTooltip:AddLine(item.note or "No personal note",1,1,1,true)
+                    GameTooltip:AddLine("Last recorded role: "..PM.RoleNames[PM.LastRole(item.name)],1,1,1,true)
                     if item.nickname and item.nickname~="" then GameTooltip:AddLine("Nickname: "..item.nickname,1,1,1,true) end
                     GameTooltip:AddLine("Tags: "..(PM.TagText(item)~="" and PM.TagText(item) or "None"),1,1,1,true)
                     local first=PM.FirstAdventure(item.name)
@@ -517,6 +644,8 @@ function PM.Refresh()
     refreshDetails()
 end
 local function build()
+    restoringView=true
+    if PM.db.rememberView then view,options=PM.CleanView(PM.db.viewState) end
     window=CreateFrame("Frame","FamiliarFacesWindow",UIParent)
     local placement=PM.db.window or {}
     window:SetSize(math.max(1100,math.min(1500,placement.width or 1120)),math.max(880,math.min(1100,placement.height or 880)))
@@ -545,9 +674,9 @@ local function build()
     end)
     button(window,"Export backup",930,-122,150,PM.ShowExport)
     controls.characterButton=button(window,"Character: All",310,-122,195,function()
-        local names=PM.Characters(); local index=0
-        for i,name in ipairs(names) do if options.owner==name then index=i end end
-        options.owner=names[index+1]; page=1; PM.Refresh()
+        local choices={{label="All characters"}}
+        for _,name in ipairs(PM.Characters()) do choices[#choices+1]={label=name,value=name} end
+        menu(controls.characterButton,"Played as",choices,"owner")
     end)
     button(window,"Settings",515,-122,198,PM.ShowSettings)
     local close=button(window,"Close",0,0,70,PM.Close)
@@ -562,17 +691,19 @@ local function build()
     search:SetSize(330,26); search:SetPoint("TOPLEFT",26,-166); search:SetAutoFocus(false); search:SetMaxLetters(100)
     search:SetScript("OnEscapePressed",search.ClearFocus)
     search:SetScript("OnTextChanged",function() page=1; PM.Refresh() end)
-    label(window,"Find a familiar face or favourite place",375,-174,350)
+    controls.roleButton=button(window,"Role: All",375,-166,160,function()
+        menu(controls.roleButton,"Recorded role",{{label="All roles"},{label="Tank",value="TANK"},{label="Healer",value="HEALER"},{label="Damage",value="DAMAGER"},{label="Unknown",value="NONE"}},"role")
+    end)
+    label(window,"Search names, notes or places",547,-174,190)
     controls.activityButton=button(window,"Activity: All",20,-202,145,function()
-        options.kind=options.kind==nil and "Dungeon" or (options.kind=="Dungeon" and "Questing" or nil)
-        controls.activityButton:SetText("Activity: "..(options.kind or "All")); page=1; PM.Refresh()
+        menu(controls.activityButton,"Activity",{{label="All activities"},{label="Dungeon",value="Dungeon"},{label="Questing",value="Questing"}},"kind")
     end)
     controls.classButton=button(window,"Class: All",172,-202,150,function()
         classes={}; local unique={}
         for _,p in pairs(PM.db.people) do if p.class then unique[p.class]=true end end
         for c in pairs(unique) do classes[#classes+1]=c end; table.sort(classes)
-        local index=0; for i,c in ipairs(classes) do if c==options.class then index=i end end
-        options.class=classes[index+1]; controls.classButton:SetText("Class: "..(options.class or "All")); page=1; PM.Refresh()
+        local choices={{label="All classes"}}; for _,c in ipairs(classes) do choices[#choices+1]={label=c,value=c} end
+        menu(controls.classButton,"Class",choices,"class")
     end)
     controls.favouritesButton=button(window,"Favourites: off",329,-202,140,function()
         options.favourites=not options.favourites; controls.favouritesButton:SetText(options.favourites and "Favourites: on" or "Favourites: off"); page=1; PM.Refresh()
@@ -581,14 +712,17 @@ local function build()
         options.notes=not options.notes; controls.notesButton:SetText(options.notes and "Notes: on" or "Notes: off"); page=1; PM.Refresh()
     end)
     button(window,"Clear filters",588,-202,125,function()
-        options.kind=nil; options.class=nil; options.favourites=false; options.notes=false; options.days=nil; options.currentParty=false; options.tag=nil; options.pinned=false; options.recentParty=false; options.owner=nil; page=1
+        options.kind=nil; options.class=nil; options.role=nil; options.favourites=false; options.notes=false; options.days=nil; options.currentParty=false; options.tag=nil; options.pinned=false; options.recentParty=false; options.owner=nil; page=1
+        if filterMenu then filterMenu:Hide() end
         controls.activityButton:SetText("Activity: All"); controls.classButton:SetText("Class: All"); controls.favouritesButton:SetText("Favourites: off"); controls.notesButton:SetText("Notes: off"); search:SetText(""); PM.Refresh()
     end)
-    controls.daysButton=button(window,"",20,-238,145,function() options.days=options.days==nil and 7 or (options.days==7 and 30 or nil); page=1; PM.Refresh() end)
+    controls.daysButton=button(window,"",20,-238,145,function()
+        menu(controls.daysButton,"When",{{label="Any time"},{label="Last 7 days",value=7},{label="Last 30 days",value=30}},"days")
+    end)
     controls.partyButton=button(window,"",172,-238,180,function() options.currentParty=not options.currentParty; page=1; PM.Refresh() end)
     controls.tagFilter=button(window,"",359,-238,262,function()
-        local tags=PM.AllTags(); local index=0; for i,tag in ipairs(tags) do if tag==options.tag then index=i end end
-        options.tag=tags[index+1]; page=1; PM.Refresh()
+        local choices={{label="All tags"}}; for _,tag in ipairs(PM.AllTags()) do choices[#choices+1]={label=tag,value=tag} end
+        menu(controls.tagFilter,"Private tag",choices,"tag")
     end)
     controls.pinnedFilter=button(window,"",628,-238,85,function() guard(function() view="Adventures"; options.pinned=not options.pinned; options.recentParty=false; page=1; PM.Refresh() end) end)
     for i=1,5 do headers[i]=button(window,"",0,-194,100,function()
@@ -596,6 +730,11 @@ local function build()
         if options.sort==key then options.ascending=not options.ascending else options.sort=key; options.ascending=key=="name" or key=="zone" or key=="class" end
         page=1; PM.Refresh()
     end) end
+    local function browse(_,delta)
+        local pages=math.max(1,math.ceil(#PM.Query(view,options)/visibleRows()))
+        page=math.max(1,math.min(pages,page+(delta<0 and 1 or -1))); PM.Refresh()
+    end
+    listScroll=CreateFrame("Frame",nil,window); listScroll:SetPoint("TOPLEFT",20,-306); listScroll:SetSize(720,480); wheel(listScroll,browse)
     for i=1,16 do
         local row=CreateFrame("Button",nil,window); row:SetSize(720,30); row:SetPoint("TOPLEFT",20,-306-(i-1)*30)
         row.bg=fill(row,0.10,0.11,0.13); row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
@@ -603,6 +742,7 @@ local function build()
         row.icon=art(row,"Interface\\Icons\\INV_Misc_Map_01",7,-7,16,16)
         row.cells={}; for j=1,5 do row.cells[j]=label(row,"",0,-9,100) end
         row.text=row.cells[1]; rows[i]=row
+        wheel(row,browse)
     end
     empty=label(window,"",40,-350,640,"GameFontHighlight")
     local prev=button(window,"Previous",0,0,95,function() page=math.max(1,page-1); PM.Refresh() end)
@@ -615,66 +755,85 @@ local function build()
     footer=label(window,"",20,0,850); footer:ClearAllPoints(); footer:SetPoint("BOTTOMLEFT",20,23)
     panel=CreateFrame("Frame",nil,window); panel:SetSize(340,704); panel:SetPoint("TOPRIGHT",-20,-154); fill(panel,0.035,0.09,0.11); border(panel)
     heading=label(panel,"",14,-15,310,"GameFontNormalLarge")
-    summary=label(panel,"",14,-48,310); summary:SetHeight(75); summary:SetJustifyV("TOP")
-    panel.linkTitle=label(panel,"",14,-132,310,"GameFontNormal")
-    for i=1,5 do links[i]=button(panel,"",14,-156-(i-1)*29,312,function() end) end
-    panel.previousLinks=button(panel,"Previous players",14,-305,150,function() linkPage=math.max(1,linkPage-1); refreshDetails() end)
-    panel.nextLinks=button(panel,"More players",170,-305,156,function() local list=related(); linkPage=math.min(math.max(1,math.ceil(#list/5)),linkPage+1); refreshDetails() end)
-    panel.noteLabel=label(panel,"A little note for next time",14,-349,300,"GameFontNormal")
+    summary=label(panel,"",14,-48,310); summary:SetHeight(90); summary:SetJustifyV("TOP")
+    panel.linkTitle=label(panel,"",14,-148,310,"GameFontNormal")
+    for i=1,LINK_ROWS do links[i]=button(panel,"",14,-172-(i-1)*29,312,function() end) end
+    panel.previousLinks=button(panel,"Previous players",14,-266,150,function() linkPage=math.max(1,linkPage-1); refreshDetails() end)
+    panel.nextLinks=button(panel,"More players",170,-266,156,function() local list=related(); linkPage=math.min(math.max(1,math.ceil(#list/LINK_ROWS)),linkPage+1); refreshDetails() end)
+    local function browseLinks(_,delta) local list=related(); linkPage=math.max(1,math.min(math.max(1,math.ceil(#list/LINK_ROWS)),linkPage+(delta<0 and 1 or -1))); refreshDetails() end
+    for _,b in ipairs(links) do wheel(b,browseLinks) end
+    panel.noteLabel=label(panel,"A little note for next time",14,-310,300,"GameFontNormal")
     panel.welcomeArt=art(panel,"Interface\\Icons\\INV_Misc_Book_09",122,-185,96,96)
     panel.welcomeText=label(panel,"The healer who saved the run.\nThe tank who showed the way.\nThe friend who made it fun.\n\nKeep their story here.",30,-325,280,"GameFontHighlight")
-    note=CreateFrame("EditBox",nil,panel,"InputBoxTemplate"); note:SetSize(302,26); note:SetPoint("TOPLEFT",20,-373); note:SetAutoFocus(false); note:SetMaxLetters(300); note:SetScript("OnEscapePressed",note.ClearFocus)
-    panel.nicknameLabel=label(panel,"Private nickname",14,-515,300,"GameFontNormal")
-    nickname=CreateFrame("EditBox",nil,panel,"InputBoxTemplate"); nickname:SetSize(302,26); nickname:SetPoint("TOPLEFT",20,-539); nickname:SetAutoFocus(false); nickname:SetMaxLetters(60); nickname:SetScript("OnEscapePressed",nickname.ClearFocus)
-    local function draftChanged() if selectedPerson then panel.noteLabel:SetText(dirty() and "Personal note - unsaved changes" or "A little note for next time") end end
+    panel.noteScroll=CreateFrame("ScrollFrame",nil,panel,"UIPanelScrollFrameTemplate"); panel.noteScroll:SetSize(288,88); panel.noteScroll:SetPoint("TOPLEFT",14,-334); fill(panel.noteScroll,0.02,0.055,0.07); border(panel.noteScroll)
+    note=CreateFrame("EditBox","FamiliarFacesNote",panel.noteScroll); note:SetSize(280,88); note:SetMultiLine(true); note:SetFontObject("GameFontHighlightSmall"); note:SetAutoFocus(false); note:SetMaxLetters(1000); note:SetScript("OnEscapePressed",note.ClearFocus); panel.noteScroll:SetScrollChild(note)
+    panel.noteCount=label(panel,"",14,-428,310)
+    panel.nicknameLabel=label(panel,"Private nickname",14,-555,300,"GameFontNormal")
+    nickname=CreateFrame("EditBox",nil,panel,"InputBoxTemplate"); nickname:SetSize(302,26); nickname:SetPoint("TOPLEFT",20,-578); nickname:SetAutoFocus(false); nickname:SetMaxLetters(60); nickname:SetScript("OnEscapePressed",nickname.ClearFocus)
+    local function draftChanged()
+        if selectedPerson or selectedSession then panel.noteLabel:SetText(dirty() and "Note - unsaved changes" or (selectedSession and "Adventure note" or "A little note for next time")) end
+        panel.noteCount:SetText(PM.TextLength(note:GetText()).." / 1000 characters | Enter adds a line")
+        local _,newlines=note:GetText():gsub("\n","")
+        note:SetHeight(math.max(88,((note.GetNumLines and note:GetNumLines()) or (newlines+1+math.ceil(#note:GetText()/40)))*16+8))
+    end
+    wheel(note,function(_,delta) if panel.noteScroll.SetVerticalScroll then panel.noteScroll:SetVerticalScroll(math.max(0,math.min(note:GetHeight()-88,(panel.noteScroll:GetVerticalScroll() or 0)-delta*32))) end end)
+    note:SetScript("OnCursorChanged",function(_,_,y,_,height)
+        if not panel.noteScroll.GetVerticalScroll then return end
+        local top=panel.noteScroll:GetVerticalScroll(); local cursor=-y
+        if cursor<top then panel.noteScroll:SetVerticalScroll(math.max(0,cursor)) elseif cursor+height>top+88 then panel.noteScroll:SetVerticalScroll(cursor+height-88) end
+    end)
     note:SetScript("OnTextChanged",draftChanged); nickname:SetScript("OnTextChanged",draftChanged)
     search:SetScript("OnTabPressed",function() if selectedPerson or selectedSession then note:SetFocus() end end)
     note:SetScript("OnTabPressed",function() if selectedPerson then nickname:SetFocus() else search:SetFocus() end end)
     nickname:SetScript("OnTabPressed",function() search:SetFocus() end)
-    for _,field in ipairs({note,nickname}) do field:SetScript("OnEnterPressed",function() saveDraft(); PM.Refresh() end) end
+    nickname:SetScript("OnEnterPressed",function() saveDraft(); PM.Refresh() end)
     search:SetScript("OnEnterPressed",function() local results=PM.Query(view,options); if results[1] then if view=="Adventures" then selectSession(results[1]) else selectPerson(results[1]) end end end)
-    actions[1]=button(panel,"Save note",14,-410,150,function()
+    actions[1]=button(panel,"Save note",14,-450,150,function()
         saveDraft(); PM.Refresh()
     end)
     actions[1].bg:SetVertexColor(0.72,0.49,0.20,1); actions[1].textLabel:SetTextColor(0.06,0.10,0.12)
-    favourite=button(panel,"Favourite",170,-410,156,function()
+    favourite=button(panel,"Favourite",170,-450,156,function()
         if selectedPerson then selectedPerson.favourite=not selectedPerson.favourite elseif selectedSession then selectedSession.pinned=not selectedSession.pinned end; PM.Refresh()
     end); actions[2]=favourite
-    actions[3]=button(panel,"Whisper",14,-442,150,function() if selectedPerson then ChatFrame_SendTell(selectedPerson.name) end end)
-    actions[4]=button(panel,"Invite",170,-442,156,function()
+    actions[3]=button(panel,"Whisper",14,-482,150,function() if selectedPerson then ChatFrame_SendTell(selectedPerson.name) end end)
+    actions[4]=button(panel,"Invite",170,-482,156,function()
         if selectedPerson and not (InCombatLockdown and InCombatLockdown()) then
             if C_PartyInfo and C_PartyInfo.InviteUnit then C_PartyInfo.InviteUnit(selectedPerson.name) elseif InviteUnit then InviteUnit(selectedPerson.name) end
         end
     end)
     for i,text in ipairs({"Helpful","Patient","Great company"}) do
-        actions[#actions+1]=button(panel,text,14+(i-1)*105,-478,100,function()
+        actions[#actions+1]=button(panel,text,14+(i-1)*105,-518,100,function()
             if selectedPerson then
                 local current=note:GetText()
                 if not string.find(current,text,1,true) then note:SetText((current:match("%S") and current.."; " or "")..text) end
             end
         end)
     end
-    actions[#actions+1]=button(panel,"Private tags",14,-577,312,showTags)
+    actions[#actions+1]=button(panel,"Private tags",14,-616,312,showTags)
     controls.forgetButton=button(panel,"Forget adventure",14,-663,312,function() guard(askForget) end)
-    panel.timeline=label(panel,"",14,-577,310); panel.timeline:SetHeight(60); panel.timeline:SetJustifyV("TOP")
-    panel.previousLocations=button(panel,"Previous locations",14,-640,150,function() locationPage=math.max(1,locationPage-1); refreshDetails() end)
-    panel.nextLocations=button(panel,"More locations",170,-640,156,function() locationPage=locationPage+1; refreshDetails() end)
+    panel.timeline=label(panel,"",14,-555,310); panel.timeline:SetHeight(60); panel.timeline:SetJustifyV("TOP")
+    panel.previousLocations=button(panel,"Previous locations",14,-624,150,function() locationPage=math.max(1,locationPage-1); refreshDetails() end)
+    panel.nextLocations=button(panel,"More locations",170,-624,156,function() locationPage=locationPage+1; refreshDetails() end)
     local resize=button(window,"Resize",0,0,65,function() end); resize:ClearAllPoints(); resize:SetPoint("BOTTOMRIGHT",-10,10)
     resize:SetScript("OnMouseDown",function() window:StartSizing("BOTTOMRIGHT") end)
     resize:SetScript("OnMouseUp",function() window:StopMovingOrSizing(); PM.SaveWindow() end)
     layout=function()
         fitWindow()
         local width=window:GetWidth()-400
+        listScroll:SetSize(width,visibleRows()*30)
         for _,row in ipairs(rows) do row:SetWidth(width) end
         PM.Refresh()
     end
-    window:SetScript("OnSizeChanged",layout); window:SetScript("OnShow",layout); window:Hide()
+    local savedQuery=options.query or ""; window:Hide(); search:SetText(savedQuery); draftChanged(); restoringView=false
+    window:SetScript("OnSizeChanged",layout); window:SetScript("OnShow",layout)
     window:SetScript("OnHide",function()
         if dirty() and not allowHide then window:Show(); PM.Close(); return end
         if forgetDialog then forgetDialog:Hide() end; pendingForget=nil
         if tagDialog then tagDialog:Hide() end
         if exportDialog then exportDialog:Hide() end
         if settingsDialog then settingsDialog:Hide() end
+        if filterMenu then filterMenu:Hide() end
+        if importDialog then importDialog:Hide() end
     end)
 end
 function PM.Toggle()

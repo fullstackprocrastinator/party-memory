@@ -9,7 +9,7 @@
   <a href="https://github.com/fullstackprocrastinator/party-memory/issues">Report an issue</a>
 </p>
 
-<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.7.0 · Good Company · MIT licensed · No addon dependencies</p>
+<p align="center"><strong>WoW Forever 1.60.1</strong> · Version 0.8.0 · Little Comforts · MIT licensed · No addon dependencies</p>
 
 ---
 
@@ -38,19 +38,27 @@ Join a party and the addon remembers who was there, when you played, and where y
 | **Find recent company** | Filter the last 7 or 30 days and highlight current party members. |
 | **Remember the story** | Write adventure notes, pin memorable runs and view how you first met a companion. |
 | **Organise your company** | Tag helpful guides, quest buddies and people to run with again; open everyone from your latest party. |
-| **Keep a backup** | Copy the complete saved journal and settings to a private text archive. |
+| **Keep a backup** | Export a private archive, preview imports and merge memories or explicitly replace your journal. Current settings stay unchanged on import. |
 | **Recognise someone on hover** | Optional player tooltip reminders show shared adventures, the last meeting and favourite status; private notes are separately opt-in. |
 | **Remember a run while it is fresh** | Optional end-of-adventure recaps provide favourite and note shortcuts, deferred during combat and loading. |
 | **Continue after a reload** | Recover the same character's exact party within five minutes of the last saved checkpoint, excluding time away. |
 | **Use your own words** | Create up to 20 private custom tags, rename them and remove them with confirmation. |
 | **Choose your character** | Filter adventures and companions by your recorded characters; companion profiles remain shared. |
 | **Settle in** | Manage preferences together in Settings or with `/ff settings`. |
+| **Remember your view** | Restore your tab, search, filters and sort across logins; reset the view whenever you like. |
+| **Give notes more room** | Save multiline notes up to 1,000 characters, with a counter and scrollable editor. |
+| **Remember their role** | See recorded Tank, Healer, Damage or Unknown roles. Filter past adventures or a companion's latest recorded role. |
+| **Browse comfortably** | Mouse-wheel paging and indexed history lookups help you explore a growing journal. |
 
 ### Two ways to explore your journal
 
 **Adventures** shows a sortable table of parties: date, activity, location, companions and duration. **Companions** shows unique players: class-coloured name, class, times together, last adventure and last seen. Select a companion to browse every adventure you shared; click an adventure to return to its party details.
 
-Use the activity, class and character buttons to cycle through their filters, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Open **Settings** for recording, favourites-first sorting, reunion notices, tooltip reminders, recaps and minimap visibility. Recaps and private tooltip notes start off. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
+Use selectable menus for activity, class, character, date, tags and historical role, toggle favourites or notes-only, and click column headings to sort. Hover a row to see its full note or party members. Open **Settings** for recording, favourites-first sorting, reunion notices, tooltip reminders, recaps and minimap visibility. Recaps and private tooltip notes start off. The teal journal uses a stylised gold wordmark, alternating rows and selected-row highlighting. Drag the bottom-right **Resize** control to resize the window.
+
+![Multiline notes and companion history](assets/curseforge/0.8.0/02-notes.png)
+
+*Demonstration rendered from the addon Lua with fictional data; native game icons and input skins are placeholders.*
 
 See the [complete addon description](docs/DESCRIPTION.md) and [changelog](CHANGELOG.md).
 
@@ -58,7 +66,7 @@ See the [complete addon description](docs/DESCRIPTION.md) and [changelog](CHANGE
 
 ### Download
 
-[Download Familiar Faces 0.7.0 for WoW Forever](downloads/FamiliarFaces-0.7.0-Forever.zip?raw=true). This is the install ZIP. Other client packages are available from [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml).
+[Download Familiar Faces 0.8.0 for WoW Forever](downloads/FamiliarFaces-0.8.0-Forever.zip?raw=true). This is the install ZIP. Other client packages are available from [Test and package workflow runs](https://github.com/fullstackprocrastinator/party-memory/actions/workflows/ci.yml).
 
 ### Install
 
@@ -76,6 +84,7 @@ Interface/
         ├── FamiliarFaces.toc
         ├── Core.lua
         ├── Store.lua
+        ├── Backup.lua
         ├── Tooltips.lua
         └── UI.lua
 ```
@@ -98,6 +107,8 @@ Select an adventure to browse its companions and location timeline, or open **Co
 | `/ff minimap` | Show or hide the minimap button. |
 | `/ff reset window` | Reset window size and position. |
 | `/ff export` | Open the journal text backup. |
+| `/ff import` | Preview and merge or replace a journal from a text backup. |
+| `/ff reset view` | Open Adventures and clear search and filters. |
 | `/ff clear` | Show instructions for clearing saved data. |
 | `/ff clear confirm` | Erase all saved history, notes and favourites. |
 
@@ -124,13 +135,13 @@ WoW writes this data on normal logout or reload. To back it up, copy:
 WTF/Account/<account>/SavedVariables/FamiliarFaces.lua
 ```
 
-Keep that file private when reporting bugs. The distribution ZIP contains code and the license, not your personal history. History stays until you clear it; very large journals can take more memory and time to search.
+Keep that file private when reporting bugs. The distribution ZIP contains code and the license, not your personal history. History stays until you clear it. Shared history indexing reduces repeated lookups; very large journals can still use more memory. Text imports accept archives up to 2 MB, 10,000 adventures and 25,000 profiles, with at most 20 custom tags after merging. Use `/ff import` while solo and outside combat. Existing text wins merge conflicts; settings are kept in both modes. Pasted backups are parsed as data, never executed as Lua.
 
 ## Compatibility
 
 | Package | Target | Validation |
 | :--- | :--- | :--- |
-| **Forever** | WoW Forever 1.60.1 · interface `16001` | Earlier builds observed in-game; 0.7.0 passes 40 automated tests and awaits its live-client checks. |
+| **Forever** | WoW Forever 1.60.1 · interface `16001` | Earlier UI loading and party recording observed in-game; 0.8.0 has automated coverage and still needs live-client checks. |
 | Retail | Interface `120007` | Packaging target; not yet verified in-game. |
 | 335 | Legacy 3.3.5 · interface `30300` | Packaging target; not yet verified in-game. |
 
@@ -155,7 +166,7 @@ python -m pip install lupa==2.8
 python tests/test_addon.py
 ```
 
-Tests cover party continuity, member replacements, location history, saved data, filters, legacy API fallbacks and UI interactions with mocked WoW APIs. For client testing, use the [in-game checklist](docs/TESTING.md). For publishing, see the [CurseForge guide](docs/CURSEFORGE.md).
+Tests cover party continuity, member replacements, location history, saved data, filters, legacy API fallbacks and UI interactions with mocked WoW APIs. For this update, use the [0.8.0 in-game checklist](docs/TESTING-0.8.0.md). For publishing, see the [CurseForge guide](docs/CURSEFORGE.md).
 
 ## Feedback and license
 

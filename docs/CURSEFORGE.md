@@ -1,8 +1,8 @@
 # CurseForge release checklist
 
-Current upload: **FamiliarFaces-0.7.0-Forever.zip**, game version **1.60.1** under **WoW Forever**. Use the 0.7.0 section of [CHANGELOG.md](../CHANGELOG.md) and the full [description](DESCRIPTION.md). The addon ZIP goes in Files; the separate media pack contains gallery images and description copy.
+Current upload: **FamiliarFaces-0.8.0-Forever.zip**, targeting **WoW Forever 1.60.1**, interface **16001**. Use [the 0.8.0 release notes](RELEASE-0.8.0.md) and the full [description](DESCRIPTION.md). Upload only the install ZIP in Files.
 
-Target remains WoW Forever 1.60.1, interface 16001. All 40 automated Lua tests pass. Complete the [0.7.0 in-game checks](TESTING-0.7.0.md) before treating the new features as live-client verified. Images in [the 0.7.0 gallery](../assets/curseforge/0.7.0) are labelled Lua demonstrations with fictional data. The `description-800` variants fit the description editor's narrower image limit.
+All 53 Familiar Faces automated Lua tests pass. The new features still need the [0.8.0 live-client checks](TESTING-0.8.0.md). The [0.8.0 gallery](../assets/curseforge/0.8.0) contains five labelled demonstrations rendered from actual addon Lua with fictional data, plus 800 px variants for the description editor. The media ZIP is separate from the install ZIP.
 
 1. Confirm the intended game client. Test the addon in that client using TESTING.md, and set its exact interface number in the TOC. Keep private-server-only packages separately labelled; do not claim support for official clients you have not tested.
 2. Run `pwsh -File scripts/package.ps1 -Client Retail` for Retail, or `-Client 335` for legacy 3.3.5. The default command produces a WoW Forever package (interface 16001); do not label it as an official Retail release. Inspect the generated ZIP: its root must contain the FamiliarFaces folder, with the TOC and Lua files inside.

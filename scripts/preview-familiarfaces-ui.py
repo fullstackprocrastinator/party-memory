@@ -6,6 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tests'))
 from test_addon import AddonTests
 DEST=ROOT/'docs'/'previews'/'familiar-faces'
+RELEASE='0.8.0 LITTLE COMFORTS'
 RECORD=r'''
 local original=CreateFrame
 local id=0
@@ -21,6 +22,7 @@ function CreateFrame(kind,name,parent,template)
  f.SetVertexColor=function(self,r,g,b,a) self.color={r,g,b,a or 1} end
  f.SetTextColor=function(self,r,g,b,a) self.textColor={r,g,b,a or 1} end
  f.SetJustifyH=function(self,a) self.align=a end
+ f.SetWordWrap=function(self,a) self.wordWrap=a end
  f.CreateTexture=function(self,n,l) local t=CreateFrame('Texture',n,self); t.layer=l; return t end
  f.CreateFontString=function(self,n,l,font) local t=CreateFrame('FontString',n,self); t.font=font; return t end
  return f
@@ -80,16 +82,16 @@ def render(state, setup=None, actions=None, title=None, caption=None):
     css.extend(['background:#24444a','border:1px solid #af8444']); body='<span style="display:block;text-align:center;color:#f1c370;font-size:18px">◇</span>'
   elif kind=='FontString':
    size=18 if f['font']=='GameFontNormalLarge' else (14 if f['font']=='GameFontNormal' else 12)
-   css.extend(['z-index:3',f'font-size:{size}px',f'line-height:{size+3}px','overflow:hidden','white-space:nowrap','color:'+color(f['textColor'],'#f1c370' if 'Normal' in (f['font'] or '') else '#f4ebd8')]); body=text(f['text'])
+   css.extend(['z-index:3',f'font-size:{size}px',f'line-height:{size+3}px','overflow:hidden','white-space:normal' if f['wordWrap'] else 'white-space:nowrap','color:'+color(f['textColor'],'#f1c370' if 'Normal' in (f['font'] or '') else '#f4ebd8')]); body=text(f['text'])
   elif kind=='EditBox':
-   css.extend(['border:1px solid #6b777e','background:#071820','padding:5px','color:#f4ebd8']); body=text(f['text'])
+   css.extend(['border:1px solid #6b777e','background:#071820','padding:5px','color:#f4ebd8','line-height:16px','overflow-wrap:anywhere','white-space:pre-wrap' if f['multiline'] else 'white-space:nowrap']); body=text(f['text'])
   elif kind=='ScrollFrame': css.append('overflow:auto')
   if kind!='Texture': body+=''.join(element(k) for k in children.get(key,[]))
   return '<div class="region" style="'+';'.join(css)+'">'+body+'</div>'
  page='<!doctype html><meta charset="utf-8"><title>Familiar Faces layout preview</title><style>body{margin:0;background:#172935;font:12px Arial;color:#eee}.region{position:absolute;box-sizing:border-box}.window{position:relative;width:1120px;height:880px;margin:20px}img{display:block}</style><p style="margin:20px">Familiar Faces · Lua layout preview · Sample data · Native icons and input skins are placeholders</p><div class="window">'+''.join(element(k) for k in children.get(0,[]))+'</div>'
  if title:
   start=page.index('<p style="margin:20px">'); end=page.index('</p>',start)+4
-  heading='<header style="padding:28px 30px 8px"><div style="color:#e6b967;font-size:12px;letter-spacing:2px">FAMILIAR FACES  /  0.7.0 GOOD COMPANY</div><h1 style="margin:10px 0;color:#f5deb0;font:32px Georgia">'+html.escape(title)+'</h1><div style="font-size:15px;color:#d4e2df">'+html.escape(caption or '')+'</div></header>'
+  heading='<header style="padding:28px 30px 8px"><div style="color:#e6b967;font-size:12px;letter-spacing:2px">FAMILIAR FACES  /  '+RELEASE+'</div><h1 style="margin:10px 0;color:#f5deb0;font:32px Georgia">'+html.escape(title)+'</h1><div style="font-size:15px;color:#d4e2df">'+html.escape(caption or '')+'</div></header>'
   page=page[:start]+heading+page[end:]
   page+='<footer style="padding:0 30px 24px;color:#bed0d0;font-size:12px">Demonstration with sample data rendered from the addon Lua. Native icons and input skins are placeholders. Created by SqueezyLemons.</footer>'
  (DEST/(state+'.html')).write_text(page,encoding='utf-8')
